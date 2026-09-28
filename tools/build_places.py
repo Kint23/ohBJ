@@ -85,6 +85,8 @@ def main() -> int:
     guben = json.loads((DATA / "guben.json").read_text(encoding="utf-8"))
     mapping = json.loads((CUR / "mapping.json").read_text(encoding="utf-8"))["places"]
     vern = {v["entry"]: v["vernacular"] for v in json.loads((CUR / "vernacular.json").read_text(encoding="utf-8"))["places"]}
+    hvern = {v["entry"]: v["history_vernacular"]
+             for v in json.loads((CUR / "history_vernacular.json").read_text(encoding="utf-8"))["places"]}
     verified = {}
     vp = DATA / "coords_verified.json"
     if vp.exists():
@@ -157,6 +159,7 @@ def main() -> int:
             "vernacular": vern.get(m["entry"], ""),
             "history_note": squash(g["text"])[: args.history] if g else "",
             "history_source": f"《京城古迹考》·{g['zone']}" if g else "",
+            "history_vernacular": hvern.get(m["entry"], ""),
             "mentions": e["mentions_simp"][:12],
         })
 

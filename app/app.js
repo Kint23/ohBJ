@@ -314,8 +314,12 @@
     }
 
     if (p.history_note) {
-      html += '<div class="d-sec"><h3>清人实地核访 <span class="muted small">' + esc(p.history_source) + '</span></h3>' +
-        '<div class="quote">' + esc(p.history_note) + '…</div></div>';
+      html += '<div class="d-sec"><h3>清人实地核访 <span class="muted small">' + esc(p.history_source) + '</span></h3>';
+      if (p.history_vernacular) {
+        html += '<div class="vern"><span class="muted small">白话今译 · AI 辅助译文</span><br/>' +
+          esc(p.history_vernacular) + '</div>';
+      }
+      html += '<div class="quote">' + esc(p.history_note) + '…</div></div>';
     }
 
     html += '<div class="d-sec"><h3>数据</h3><p class="small muted">' +
