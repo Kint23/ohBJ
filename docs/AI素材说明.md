@@ -93,20 +93,35 @@ uv run tools/make_film.py --force                # 重出静帧（换 seed 就�
 | `video/氛围-帝京寻踪.mp4` | **氛围铺垫 10 幕**（41.5s，每幕带「明清名 → 今名」字幕） |
 | `video/开场-帝京寻踪.mp4` | 片头 + 氛围拼接（55.1s） |
 | `video/演示-帝京寻踪.mp4` | 真实页面截图合成演示片（34.9s，7 个操作状态） |
-| `video/正片-帝京寻踪.mp4` | **60 秒正片**（60.0s / 1080p / 5.2 Mbps / **字幕已内嵌** / 原创配乐，无配音） |
+| `video/正片-帝京寻踪.mp4` | **正片**（65.0s = 5s 古图开场 + 60s 实机 / 1080p / 6.75 Mbps / 字幕已内嵌 / 原创配乐，无配音） |
 
 > 字幕**只保留内嵌这一份**，不再另存外挂 SRT。需要时可随时用
 > `uv run tools/record_demo.py --srt-only` 从代码里的时间轴重新导出。
 
 `video/` **不会**被 GitHub Pages 发布（workflow 只发布 `app/`、`data/places.json`、`data/routes.json`、`docs/`）。
 
-## 五、60 秒正片（已生成，无配音）
+## 五、正片（5 秒古图开场 + 60 秒实机，已生成，无配音）
 
-三条脚本串成一条流水线：
+### `tools/intro_card.py` —— 把古地图做成开场
+```powershell
+uv run tools/intro_card.py                     # 预览单帧
+uv run tools/intro_card.py --image 京师五城图.jpg --out banner/_intro_preview.png
+```
+把《京師五城圖》合成成 16:9 开场（左文右图：朱印 + 楷体标题 + 副题 + 两行说明），
+再与实机首帧**交叉淡化 0.8s**，形成「古图 → 今图」的过渡。两个要点：
+
+- **multiply 混合**把古图自身的白底换成项目宣纸色，于是接缝完全消失
+  （直接贴图会看到一块突兀的白色矩形）。
+- 运镜沿用浮点仿射（BICUBIC 平移 + LANCZOS 降采样），不用 ffmpeg `zoompan`。
+
+`record_demo.py` 会调用它：`--intro-image`（默认 `京师五城图.jpg`）/ `--intro-secs 5` / `--no-intro`。
+因总长变为 65s，配乐也要相应加长（`--seconds 70`），字幕会自动整体平移 5 秒。
+
+三个脚本串成一条流水线：
 
 ### `tools/make_music.py` —— 原创轻快轻音乐（无版权顾虑）
 ```powershell
-uv run tools/make_music.py --seconds 62 --out video/music.wav
+uv run tools/make_music.py --seconds 70 --out video/music.wav
 ```
 numpy 加法合成：马林巴质感的亮拨弦 + 柔和衷底 + 沙锤半拍 + 轻木击，
 尾部多抽头扩散当混响。**G 大调 I–V–vi–IV（G–D–Em–C）/ 112 BPM**，西式轻音乐而非中国风。
@@ -163,7 +178,7 @@ uv run tools/make_subs.py --srt video/正片字幕.srt --out video/subs.ass --si
 | 12 | ~9 Mbps | ~65 MB | 收益有限（估算） |
 | 10 | ~14 Mbps | ~100 MB | 基本无意义（估算） |
 
-实测：**60.0s / 1920×1080 / 25fps / 37.3 MB / 5.2 Mbps**，
+实测：**65.0s / 1920×1080 / 25fps / 52.3 MB / 6.75 Mbps**，实际帧数 1625（= 65×25）。
 音量 mean −17.1 dB、max −3.8 dB（纯音乐场景合适）。
 
 **为什么不再往上堆码率**：源头是 JPEG q90（≈410 KB/帧），
@@ -172,6 +187,16 @@ CRF 15 已接近它的实际信息量，再降 CRF 主要是把 JPEG 的块状�
 
 > 踩坑：ffmpeg 滤镜参数里的路径**不能带盘符冒号**（`C:` 会被当成选项分隔符，
 > 报 `Unable to parse "original_size"`）。脚本里的 `filter_path()` 会尽量转成相对路径。
+>
+> 踩坑：concat 清单里的路径必须写**绝对路径**。解复用器会把相对路径按
+> “清单文件所在目录”再解析一次，与 Path 的相对基准叠加就变成
+> `video/_frames/video/_frames/xxx.jpg`。
+>
+> 踩坑：Chrome 投射**只在画面变化时发帧**，静止段（读详情那十几秒）会有几秒空隙。
+> 若按“实测间隔”写时长再给单帧封顶，空隙被压编会**把视频截短**
+> （曾实测：容器报 65s，实际只有 940 帧 / 37.6s）。
+> 修法是 `resample()` 把变帧率时间轴重采样到 25fps 均匀网格（用最近的前一帧填充），
+> 每帧恰好 1/fps，总时长精确。
 
 ### 字幕只有一份：内嵌
 成片里的字幕是**烧进画面**的（楷体 46px），不再另存外挂 SRT。

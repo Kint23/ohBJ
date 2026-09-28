@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["playwright"]
+# dependencies = ["playwright", "pillow"]
 # ///
 """抓高质量帧，合成 60 秒正片（1920x1080），字幕直接烧入。
 
@@ -33,17 +33,21 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.stdout.reconfigure(errors="replace")
 
+from PIL import Image  # noqa: E402
+
+import intro_card  # noqa: E402
 import make_subs  # noqa: E402
 
 W, H = 1920, 1080
 FPS = 25
 END_AT = 60.0
 EXTRA_TAIL = 2.0
+INTRO_SEC = 5.0   # 古地图开场时长
+INTRO_FADE = 0.8  # 与实机首帧交叉淡化时长
 
 # 时间轴：秒 -> 字幕（指"片头修剪后"的成片时间）
 SUBS = [
@@ -282,11 +286,11 @@ def run(cmd, quiet: bool = False) -> None:
         print(" ".join(str(c) for c in cmd[:3]) + " ... ok", flush=True)
 
 
-def sub_times() -> list[tuple[float, float, str]]:
+def sub_times(shift: float = 0.0) -> list[tuple[float, float, str]]:
     out = []
     for i, (t, text) in enumerate(SUBS):
         end = SUBS[i + 1][0] - 0.3 if i + 1 < len(SUBS) else END_AT
-        out.append((t, max(end, t + 1.0), text))
+        out.append((t + shift, max(end, t + 1.0) + shift, text))
     return out
 
 
@@ -303,25 +307,57 @@ def write_srt(out: Path) -> None:
     out.write_text("\n".join(lines), encoding="utf-8")
 
 
-def encode_from_screencast(sc: Screencast, out_path: Path, *, trim: float,
-                           ass: Path, music: Path, crf: int, gain: float) -> None:
-    """按真实时间戳把 JPEG 帧编成成片，并烧字幕 + 混音。"""
-    sel = [(i, t - trim) for i, t in enumerate(sc.stamps)
-           if trim - 1e-3 <= t <= END_AT + 0.35]
-    if len(sel) < 10:
-        raise SystemExit(f"可用帧太少（{len(sel)}）")
-    lines = []
-    for k, (idx, rel) in enumerate(sel):
-        nxt = sel[k + 1][1] if k + 1 < len(sel) else rel + 1.0 / FPS
-        d = min(0.5, max(1.0 / (FPS * 2), nxt - rel))
-        lines.append(f"file 'f{idx:06d}.jpg'")
-        lines.append(f"duration {d:.4f}")
-    lines.append(f"file 'f{sel[-1][0]:06d}.jpg'")
-    listfile = sc.dir / "frames.txt"
-    listfile.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"编码：{len(sel)} 帧，CRF {crf}，码率上限由 CRF 决定", flush=True)
+def resample(frames: list[tuple[Path, float]], total: float, fps: int
+             ) -> list[tuple[Path, float]]:
+    """把变帧率时间轴重采样到均匀 fps 网格（用「最近的前一帧」填充）。
 
-    fade_out = max(0.0, END_AT - 4.0)
+    为什么必须重采样：Chrome 的投射**只在画面变化时发帧**，读详情这类静止段
+    可能有几秒的空隙。若直接按“实测间隔”写时长再给单帧封顶，
+    这些空隙会被压编，总时长远远不够（实测 65s 只剩 37.6s、视频被截断）。
+    重采样到固定网格后，每帧恰好 1/fps，总时长精确。
+    """
+    if not frames:
+        return []
+    frames = sorted(frames, key=lambda x: x[1])
+    n = int(round(total * fps))
+    out: list[tuple[Path, float]] = []
+    j = 0
+    for i in range(n):
+        t = i / fps
+        while j + 1 < len(frames) and frames[j + 1][1] <= t + 1e-6:
+            j += 1
+        out.append((frames[j][0], t))
+    return out
+
+
+def write_concat(frames: list[tuple[Path, float]], listfile: Path,
+                 fps: int = FPS) -> None:
+    """写 concat 清单（已重采样，每帧等长）。
+
+    注意：路径必须写**绝对路径**。concat 解复用器会把相对路径按
+    “清单文件所在目录”再解析一次，与 Path 的相对基准叠加就会变成
+    `video/_frames/video/_frames/xxx.jpg` 这种拼接错误。
+    """
+    d = 1.0 / fps
+    lines = []
+    for p, _t in frames:
+        lines.append(f"file '{p.resolve().as_posix()}'")
+        lines.append(f"duration {d:.5f}")
+    # concat 解复用器要求最后再重复一次文件名（否则末帧可能被丢弃）
+    lines.append(f"file '{frames[-1][0].resolve().as_posix()}'")
+    listfile.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def encode_frames(frames: list[tuple[Path, float]], out_path: Path, *, total: float,
+                  ass: Path, music: Path, crf: int, gain: float, listfile: Path) -> None:
+    """JPEG 帧序列 -> 成片，一次完成烧字幕 + 混音。"""
+    grid = resample(frames, total, FPS)
+    if len(grid) < 10:
+        raise SystemExit(f"可用帧太少（{len(grid)}）")
+    write_concat(grid, listfile, FPS)
+    print(f"编码：输入 {len(frames)} 帧 -> 重采样 {len(grid)} 帧 / {total:.1f}s，CRF {crf}",
+          flush=True)
+    fade_out = max(0.0, total - 4.0)
     run([ffmpeg(), "-y", "-loglevel", "error",
          "-f", "concat", "-safe", "0", "-i", str(listfile),
          "-i", str(music),
@@ -333,7 +369,7 @@ def encode_from_screencast(sc: Screencast, out_path: Path, *, trim: float,
          "-c:v", "libx264", "-crf", str(crf), "-preset", "slow",
          "-x264-params", "keyint=50:min-keyint=25",
          "-fps_mode", "cfr", "-r", str(FPS), "-pix_fmt", "yuv420p",
-         "-c:a", "aac", "-b:a", "192k", "-t", f"{END_AT:.3f}",
+         "-c:a", "aac", "-b:a", "192k", "-t", f"{total:.3f}",
          "-movflags", "+faststart", str(out_path)])
 
 
@@ -404,6 +440,11 @@ def main() -> int:
     ap.add_argument("--crf", type=int, default=15, help="成片 CRF，越小越清晰越大")
     ap.add_argument("--gain", type=float, default=0.78, help="配乐音量")
     ap.add_argument("--font-size", type=int, default=46)
+    ap.add_argument("--intro-image", dest="intro_image", default="京师五城图.jpg",
+                    help="古地图开场图（默认京师五城图.jpg）")
+    ap.add_argument("--intro-secs", dest="intro_secs", type=float, default=INTRO_SEC)
+    ap.add_argument("--no-intro", dest="no_intro", action="store_true",
+                    help="不做古地图开场")
     ap.add_argument("--no-encode", action="store_true", help="只录不编码")
     ap.add_argument("--keep-frames", dest="keep_frames", action="store_true",
                     help="采集帧留在 video/_frames（约 300 MB），便于换 CRF 重编码")
@@ -441,14 +482,13 @@ def main() -> int:
 
     if args.encode_only:
         fdir = outdir / "_frames"
-        meta = json.loads((fdir / "stamps.json").read_text(encoding="utf-8"))
-        tl = outdir / "_timeline.json"
-        trim = (json.loads(tl.read_text(encoding="utf-8"))["trim_start"]
-                if tl.exists() else float(meta.get("trim", 0.0)))
-        make_subs.write_ass(sub_times(), ass, width=W, height=H, size=args.font_size)
-        encode_from_screencast(SimpleNamespace(dir=fdir, stamps=meta["stamps"]),
-                               out_mp4, trim=trim, ass=ass, music=music,
-                               crf=args.crf, gain=args.gain)
+        plan = json.loads((fdir / "plan.json").read_text(encoding="utf-8"))
+        frames = [(fdir / n, t) for n, t in plan["frames"]]
+        shift = float(plan.get("shift", 0.0))
+        total = float(plan["total"])
+        make_subs.write_ass(sub_times(shift), ass, width=W, height=H, size=args.font_size)
+        encode_frames(frames, out_mp4, total=total, ass=ass, music=music,
+                      crf=args.crf, gain=args.gain, listfile=fdir / "frames.txt")
         print(f"{out_mp4}  {out_mp4.stat().st_size / 1024 / 1024:.1f} MB  (CRF {args.crf})",
               flush=True)
         return 0
@@ -629,17 +669,55 @@ def main() -> int:
             ctx.close()
             browser.close()
 
-        # 字幕：直接从代码里的时间轴写 ASS（不经外挂 SRT）
-        # 写到相对路径，避开滤镜参数里盘符冒号的问题
-        make_subs.write_ass(sub_times(), ass, width=W, height=H, size=args.font_size)
+        # ---- 组装帧时间轴：古地图开场 + 实机画面 ----
+        total = END_AT
+        shift = 0.0
+        frames: list[tuple[Path, float]] = []
+        use_intro = (not args.no_intro) and args.capture == "cdp" and sc is not None
+        if use_intro:
+            img = Path(args.intro_image)
+            if img.exists():
+                shift = args.intro_secs
+                total = END_AT + shift
+                idx0 = next((i for i, t in enumerate(sc.stamps)
+                             if t >= offset - 1e-3), None)
+                if idx0 is None:
+                    raise SystemExit("拿不到实机首帧，无法做开场过渡")
+                first_app = Image.open(sc.dir / f"f{idx0:06d}.jpg")
+                master = intro_card.compose_master(str(img))
+                frames += intro_card.render_frames(
+                    master, first_app, sc.dir, secs=args.intro_secs,
+                    fade=INTRO_FADE, fps=FPS)
+                print(f"开场：{args.intro_secs:.1f}s 《{img.stem}》（末 {INTRO_FADE}s 淡入实机）",
+                      flush=True)
+            else:
+                print(f"! 找不到开场图 {img}，跳过开场", flush=True)
+        elif args.capture != "cdp":
+            print("! --capture video 模式不支持开场，已跳过", flush=True)
+
+        if sc is not None:
+            frames += [(sc.dir / f"f{i:06d}.jpg", t - offset + shift)
+                       for i, t in enumerate(sc.stamps)
+                       if t >= offset - 1e-3 and t - offset + shift <= total + 0.35]
+        frames.sort(key=lambda x: x[1])
+        (sc.dir / "plan.json").write_text(json.dumps(
+            {"total": total, "shift": shift,
+             "frames": [[p.name, round(t, 4)] for p, t in frames]},
+            ensure_ascii=False), encoding="utf-8")
+
+        # 字幕：直接从代码里的时间轴写 ASS（按 shift 平移）
+        make_subs.write_ass(sub_times(shift), ass, width=W, height=H,
+                            size=args.font_size)
 
         if args.no_encode:
             print("--no-encode：跳过编码", flush=True)
             return 0
 
         if args.capture == "cdp":
-            encode_from_screencast(sc, out_mp4, trim=offset, ass=ass,
-                                   music=music, crf=args.crf, gain=args.gain)
+            if not frames:
+                raise SystemExit("没有可用帧")
+            encode_frames(frames, out_mp4, total=total, ass=ass, music=music,
+                          crf=args.crf, gain=args.gain, listfile=sc.dir / "frames.txt")
         else:
             webms = sorted(recdir.glob("*.webm"))
             if not webms:
