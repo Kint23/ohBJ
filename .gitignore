@@ -34,3 +34,5 @@ video/_timeline.json
 video/music.wav
 video/subs.ass
 video/subs.srt
+# 字幕只保留内嵌那一份；外挂 SRT 可按需用 record_demo.py --srt-only 重新导出
+video/正片字幕.srt

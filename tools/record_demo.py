@@ -9,8 +9,10 @@
 
 产出：
   video/_raw.webm        原始录像（1920x1080）
-  video/正片字幕.srt      **唯一一套字幕**，时间已扣除片头加载段
   video/_timeline.json    各步骤时间戳与片头修剪量
+
+字幕最终是**烧进成片**的，不随仓库另存外挂 SRT；
+需要时用 `--srt-only` 从本文件里的 SUBS 时间轴单独导出（不录像）。
 """
 from __future__ import annotations
 
@@ -260,10 +262,20 @@ def main() -> int:
     ap.add_argument("--outdir", default="video")
     ap.add_argument("--list-only", action="store_true")
     ap.add_argument("--probe", action="store_true", help="只自检交互，不录像")
+    ap.add_argument("--srt-only", dest="srt_only", action="store_true",
+                    help="只从当前时间轴导出字幕，不录像")
     args = ap.parse_args()
 
     if args.probe:
         return probe(args.base)
+
+    if args.srt_only:
+        outdir = Path(args.outdir)
+        outdir.mkdir(parents=True, exist_ok=True)
+        p = outdir / "正片字幕.srt"
+        write_srt(SUBS, p)
+        print(f"{p}  {len(SUBS)} 条  （中间产物，成片里的字幕已烧入）", flush=True)
+        return 0
 
     if args.list_only:
         for t, s in SUBS:

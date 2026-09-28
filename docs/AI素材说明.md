@@ -93,8 +93,10 @@ uv run tools/make_film.py --force                # 重出静帧（换 seed 就�
 | `video/氛围-帝京寻踪.mp4` | **氛围铺垫 10 幕**（41.5s，每幕带「明清名 → 今名」字幕） |
 | `video/开场-帝京寻踪.mp4` | 片头 + 氛围拼接（55.1s） |
 | `video/演示-帝京寻踪.mp4` | 真实页面截图合成演示片（34.9s，7 个操作状态） |
-| `video/正片-帝京寻踪.mp4` | **60 秒正片**（60.0s / 1080p / 烧字幕 / 原创配乐，无配音） |
-| `video/正片字幕.srt` | **唯一一套字幕**，与正片时间轴对齐 |
+| `video/正片-帝京寻踪.mp4` | **60 秒正片**（60.0s / 1080p / **字幕已内嵌** / 原创配乐，无配音） |
+
+> 字幕**只保留内嵌这一份**，不再另存外挂 SRT。需要时可随时用
+> `uv run tools/record_demo.py --srt-only` 从代码里的时间轴重新导出。
 
 `video/` **不会**被 GitHub Pages 发布（workflow 只发布 `app/`、`data/places.json`、`data/routes.json`、`docs/`）。
 
@@ -120,7 +122,8 @@ uv run tools/record_demo.py --list-only
 全景推移 → 拉远看全城 → 筛选（`三·城南內外` + `寺院`，30→2）→ 点开盧溝橋 →
 逐段阅读 **白话今译 / 原书记载 / 关联诗篇（展开）/ 清人实地核访** →
 智能排线 3 方案 → 应用方案 + 混合模式 + 生成真实路线 → AI 导游 → 落版。
-同时写出 `video/正片字幕.srt`（**唯一一套字幕**）与 `video/_timeline.json`（含片头加载耗时 `trim_start`）。
+同时写出 `video/_timeline.json`（含片头加载耗时 `trim_start`）；
+字幕文本只存在代码里的 `SUBS` 列表，要改就改那里。
 
 录制前先跑 `uv run tools/record_demo.py --probe` 自检，能省一次白录。三个已踩过的坑：
 
@@ -151,9 +154,17 @@ ffmpeg -y -ss $trim -i video/_raw.webm -i video/music.wav -filter_complex `
 `-ss $trim` = 剪掉地图加载那几秒（值见 `video/_timeline.json`）；`-t 60` = 精确截到 60 秒。
 成品：**60.0s / 1920×1080 / 25fps / 20.6 MB**，音量 mean −17.1 dB、max −3.8 dB（纯音乐场景合适）。
 
-### 字幕只保留一套
-全流程只有 `video/正片字幕.srt` 这一份字幕源（`subs.ass` 是由它派生，不单独维护）。
-要做人声版，直接用这份 SRT 当配音稿；人声进来后把配乐压到 −18 ~ −22 dB。
+### 字幕只有一份：内嵌
+成片里的字幕是**烧进画面**的（楷体 46px），不再另存外挂 SRT。
+字幕文本的唯一来源是 `tools/record_demo.py` 里的 `SUBS` 列表，修改后：
+
+```powershell
+uv run tools/record_demo.py --srt-only      # 只导出 SRT，不录像
+uv run tools/make_subs.py --srt video/正片字幕.srt --out video/subs.ass --size 46
+```
+
+`video/正片字幕.srt` 与 `video/subs.ass` 都是中间产物，已 gitignore。
+要做人声版，直接用导出的 SRT 当配音稿；人声进来后把配乐压到 −18 ~ −22 dB。
 
 ## 六、可复现性
 
