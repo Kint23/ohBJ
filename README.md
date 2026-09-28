@@ -9,17 +9,18 @@
 
 ## 作品演示（60 秒）
 
-<video src="https://kint23.github.io/ohBJ/video/demo.mp4" controls width="720"></video>
+[![点击播放 60 秒正片](banner/teaser.webp)](https://kint23.github.io/ohBJ/video/demo.mp4)
 
-若上面的播放器未显示（部分客户端不支持 `<video>`），点下面的封面图播放：
+**点上面的动图即可播放正片**（MP4，约 53 MB，浏览器内直接播放，无需下载）：
+<https://kint23.github.io/ohBJ/video/demo.mp4>
+🖥 **在线 Demo**：<https://kint23.github.io/ohBJ/> ｜ 📷 **封面图**：`banner/帝京寻踪-banner-1200x675.png`
 
-[![点击播放：帝京寻踪 · 60 秒演示](banner/帝京寻踪-banner-1200x675.png)](https://kint23.github.io/ohBJ/video/demo.mp4)
-
-▶ **在线播放 / 下载**：<https://kint23.github.io/ohBJ/video/demo.mp4>（MP4，约 53 MB）
-🖥 **在线 Demo**：<https://kint23.github.io/ohBJ/>
-
-> 视频内容：5 秒《京師五城圖》古地图开场 → 实机操作（三重筛选 → 点开盧溝橋 →
+> 正片内容：5 秒《京師五城圖》古地图开场 → 实机操作（三重筛选 → 点开盧溝橋 →
 > 白话今译 / 原书记载 / 关联诗篇 / 清人实地核访 → 智能排线 3 方案 → 百度路线规划真实里程）→ 落版。
+> 上方动图为正片节选（无声），完整版含字幕与原创配乐。
+
+> 📌 说明：GitHub 的 README 会过滤 `<video>` 标签，因此这里用**可点击的动图预览**代替内嵌播放器；
+> 想要真·内嵌播放器，只能把 MP4 作为 GitHub 附件上传（见 `docs/提交材料.md`）。
 
 ---
 
