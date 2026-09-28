@@ -9,6 +9,10 @@
 
 ## 作品演示（60 秒）
 
+<video src="https://kint23.github.io/ohBJ/video/demo.mp4" controls width="720"></video>
+
+若上面的播放器未显示（部分客户端不支持 `<video>`），点下面的封面图播放：
+
 [![点击播放：帝京寻踪 · 60 秒演示](banner/帝京寻踪-banner-1200x675.png)](https://kint23.github.io/ohBJ/video/demo.mp4)
 
 ▶ **在线播放 / 下载**：<https://kint23.github.io/ohBJ/video/demo.mp4>（MP4，约 53 MB）
