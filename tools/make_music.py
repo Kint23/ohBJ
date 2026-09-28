@@ -2,12 +2,12 @@
 # requires-python = ">=3.10"
 # dependencies = ["numpy"]
 # ///
-"""合成一段**原创**古风背景音乐（无版权顾虑），供正片使用。
+"""合成一段**原创轻快轻音乐**（无版权顾虑），供正片使用。
 
-做法：numpy 加法合成拨弦音色 + 低音衬底 + 轻木击，尾部多抽头扩散当作混响。
-D 宫调式（五声：D E F# A B），92 BPM 轻快。
+风格：西式轻音乐 / easy listening。G 大调 I–V–vi–IV（G–D–Em–C），112 BPM，
+马林巴质感的亮拨弦 + 柔和衬底 + 沙锤半拍 + 轻木击，尾部多抽头扩散当混响。
 
-    uv run tools/make_music.py --seconds 186 --out video/music.wav
+    uv run tools/make_music.py --seconds 62 --out video/music.wav
 """
 from __future__ import annotations
 
@@ -22,51 +22,76 @@ import numpy as np
 sys.stdout.reconfigure(errors="replace")
 
 SR = 44100
-BPM = 92.0
+BPM = 112.0
 BEAT = 60.0 / BPM
 EIGHTH = BEAT / 2.0
 
-# D 宫调式五声（低八度到高八度各铺一层）
-SCALE = np.array([293.66, 329.63, 369.99, 440.00, 493.88, 587.33, 659.25, 739.99])
+# G 大调 I–V–vi–IV：(三和弦三个音, 低音)
+PROG = [
+    ((392.00, 493.88, 587.33), 196.00),  # G   G B D
+    ((293.66, 369.99, 440.00), 146.83),  # D   D F# A
+    ((329.63, 392.00, 493.88), 164.81),  # Em  E G B
+    ((261.63, 329.63, 392.00), 130.81),  # C   C E G
+]
+
+# 每小节 8 个八分音的琶音型（0/1/2=和弦音，3=根音高八度）
+PATTERNS = [
+    [0, 1, 2, 3, 2, 1, 0, 2],
+    [0, 2, 1, 3, 1, 2, 0, 1],
+    [3, 1, 2, 0, 2, 1, 3, 2],
+    [0, 1, 3, 2, 1, 0, 2, 1],
+]
 
 
-def pluck(freq: float, dur: float, amp: float = 1.0, bright: float = 0.42) -> np.ndarray:
-    """拨弦音色：谐波叠加 + 各谐波不同衰减率 + 快速起振。"""
+def pluck(freq: float, dur: float, amp: float = 1.0) -> np.ndarray:
+    """亮而短的拨弦（马林巴/钢片琴质感）。"""
     n = int(dur * SR)
     t = np.arange(n, dtype=np.float64) / SR
     out = np.zeros(n)
-    for k in range(1, 13):
-        a = amp * (bright ** (k - 1)) / (k ** 1.15)
+    for k in range(1, 10):
+        a = amp * (0.50 ** (k - 1)) / k
         if a < 2e-4:
             break
-        tau = 1.25 / (1.0 + 0.5 * (k - 1))
-        out += a * np.sin(2 * np.pi * freq * k * t + 0.6 * k) * np.exp(-t / tau)
-    out *= 1.0 - np.exp(-t / 0.0035)
-    return out
+        tau = 0.60 / (1.0 + 0.35 * (k - 1))
+        out += a * np.sin(2 * np.pi * freq * k * t + 0.5 * k) * np.exp(-t / tau)
+    return out * (1.0 - np.exp(-t / 0.0025))
 
 
-def drone(freq: float, dur: float, amp: float) -> np.ndarray:
+def pad(freqs, dur: float, amp: float) -> np.ndarray:
+    """柔和衬底：慢起慢落，轻微颤动。"""
     n = int(dur * SR)
     t = np.arange(n, dtype=np.float64) / SR
-    trem = 1.0 + 0.07 * np.sin(2 * np.pi * 0.11 * t)
-    return amp * trem * (np.sin(2 * np.pi * freq * t) + 0.3 * np.sin(2 * np.pi * freq * 2 * t))
-
-
-def wood_click(amp: float = 0.5) -> np.ndarray:
-    n = int(0.10 * SR)
-    t = np.arange(n, dtype=np.float64) / SR
-    rng = np.random.default_rng(11)
-    noise = np.convolve(rng.normal(0, 1, n), np.ones(6) / 6, mode="same")
-    return amp * (0.75 * np.sin(2 * np.pi * 430 * t) + 0.25 * noise) * np.exp(-t / 0.011)
-
-
-def bell(freq: float, amp: float = 0.3) -> np.ndarray:
-    n = int(1.8 * SR)
-    t = np.arange(n, dtype=np.float64) / SR
     out = np.zeros(n)
-    for k, w in ((1, 1.0), (2.76, 0.5), (5.4, 0.25), (8.9, 0.12)):
-        out += w * np.sin(2 * np.pi * freq * k * t) * np.exp(-t / (1.2 / k ** 0.5))
-    return amp * out * (1 - np.exp(-t / 0.002))
+    for f in freqs:
+        out += np.sin(2 * np.pi * f * t) + 0.25 * np.sin(2 * np.pi * f * 2 * t)
+    out *= amp * (1.0 + 0.05 * np.sin(2 * np.pi * 0.19 * t))
+    attack = np.minimum(1.0, t / 0.35)
+    release = np.minimum(1.0, (dur - t) / 0.45)
+    return out * attack * np.clip(release, 0, 1)
+
+
+def shaker(amp: float = 0.30) -> np.ndarray:
+    """沙锤：高通噪声 + 极快衰减。"""
+    n = int(0.05 * SR)
+    rng = np.random.default_rng(23)
+    noise = rng.normal(0, 1, n)
+    hp = np.diff(noise, prepend=0.0)  # 一阶高通
+    t = np.arange(n, dtype=np.float64) / SR
+    return amp * hp * np.exp(-t / 0.008)
+
+
+def tick(freq: float = 1180.0, amp: float = 0.22) -> np.ndarray:
+    n = int(0.06 * SR)
+    t = np.arange(n, dtype=np.float64) / SR
+    return amp * np.sin(2 * np.pi * freq * t) * np.exp(-t / 0.012)
+
+
+def bass(freq: float, dur: float, amp: float = 0.5) -> np.ndarray:
+    n = int(dur * SR)
+    t = np.arange(n, dtype=np.float64) / SR
+    out = (np.sin(2 * np.pi * freq * t) + 0.3 * np.sin(2 * np.pi * freq * 2 * t)
+           + 0.12 * np.sin(2 * np.pi * freq * 3 * t))
+    return amp * out * np.exp(-t / 0.85) * (1.0 - np.exp(-t / 0.006))
 
 
 def add(buf: np.ndarray, sig: np.ndarray, at: int, gain: float = 1.0) -> None:
@@ -77,18 +102,18 @@ def add(buf: np.ndarray, sig: np.ndarray, at: int, gain: float = 1.0) -> None:
         buf[at:at + n] += sig[:n] * gain
 
 
-def diffuse(x: np.ndarray, seed: int, taps: int = 11):
-    """多抽头扩散 + 左右不同延迟 -> 廉价但有空间感的混响，并得到立体声宽度。"""
+def diffuse(x: np.ndarray, seed: int, taps: int = 10):
+    """多抽头扩散 + 左右不同延迟 -> 廉价但有空间感的混响与立体声宽度。"""
     rng = np.random.default_rng(seed)
     left = np.zeros_like(x)
     right = np.zeros_like(x)
     for _ in range(taps):
-        d = float(rng.uniform(0.012, 0.30))
-        g = float(rng.uniform(0.10, 0.40)) * math.exp(-d * 3.4)
+        d = float(rng.uniform(0.010, 0.22))
+        g = float(rng.uniform(0.10, 0.34)) * math.exp(-d * 4.0)
         n = int(d * SR)
         if n < len(x):
             left[n:] += x[:-n] * g
-            n2 = max(1, int(d * float(rng.uniform(0.93, 1.07)) * SR))
+            n2 = max(1, int(d * float(rng.uniform(0.92, 1.08)) * SR))
             if n2 < len(x):
                 right[n2:] += x[:-n2] * g
     return left, right
@@ -96,62 +121,60 @@ def diffuse(x: np.ndarray, seed: int, taps: int = 11):
 
 def build(seconds: float) -> np.ndarray:
     total = int(seconds * SR)
-    melody = np.zeros(total)
-    bass = np.zeros(total)
+    arp = np.zeros(total)
+    pads = np.zeros(total)
     perc = np.zeros(total)
-    rng = np.random.default_rng(20260929)
+    lows = np.zeros(total)
+    rng = np.random.default_rng(31415)
 
     bar_len = BEAT * 4
     n_bars = int(seconds / bar_len) + 1
-
-    # 每小节 8 个八分音的旋律：五声随机游走 + 重音
     for bar in range(n_bars):
         t_bar = bar * bar_len
-        idx = int(rng.integers(0, 5))
-        for step in range(8):
+        at_bar = int(t_bar * SR)
+        triad, root = PROG[bar % 4]
+        pattern = PATTERNS[(bar + (bar // 4)) % 4]
+
+        # 旋律琶音
+        for step, pi in enumerate(pattern):
             at = int((t_bar + step * EIGHTH) * SR)
-            # 随机游走
-            idx = int(np.clip(idx + rng.integers(-2, 3), 0, 7))
-            if step in (0, 4):
-                idx = int(np.clip(idx + 2, 0, 7))
-            accent = 1.0 if step in (0, 4) else (0.66 if step % 2 == 0 else 0.5)
-            dur = 1.5 if step == 0 else 0.9
-            add(melody, pluck(SCALE[idx], dur, amp=0.5), at, accent)
+            note = triad[pi % 3] * (2.0 if pi == 3 else 1.0)
+            if rng.random() < 0.10:  # 偶尔加个上邻音，避免太机械
+                note *= 1.1225
+            accent = 1.0 if step in (0, 4) else (0.72 if step % 2 == 0 else 0.55)
+            dur = 1.1 if step == 0 else 0.75
+            add(arp, pluck(note, dur, amp=0.42), at, accent)
 
-        # 低音：每 2 小节换一次
-        if bar % 2 == 0:
-            root = 73.42 if (bar // 2) % 2 == 0 else 110.0  # D2 / A2
-            add(bass, drone(root, bar_len * 2, 0.16), int(t_bar * SR))
+        # 衬底 + 低音
+        add(pads, pad(triad, bar_len, 0.055), at_bar)
+        add(lows, bass(root, bar_len * 0.9, 0.34), at_bar)
+        add(lows, bass(root, bar_len * 0.45, 0.20), int((t_bar + 2 * BEAT) * SR))
 
-        # 木击：每小节第 1、3 拍
-        for b in (0.0, 2.0):
-            add(perc, wood_click(0.30), int((t_bar + b * BEAT) * SR))
+        # 沙锤半拍 + 2/4 拍轻击
+        for step in (1, 3, 5, 7):
+            add(perc, shaker(0.24), int((t_bar + step * EIGHTH) * SR))
+        for b in (1, 3):
+            add(perc, tick(amp=0.16), int((t_bar + b * BEAT) * SR))
 
-        # 每 8 小节加一记铃
-        if bar % 8 == 0:
-            add(perc, bell(SCALE[int(rng.integers(5, 8))], 0.18), int(t_bar * SR))
-
-    dry = melody + bass + perc
-    left, right = diffuse(dry, 4242)
-    left = dry * 0.72 + left * 0.55
-    right = dry * 0.72 + right * 0.55
+    dry = arp * 1.0 + pads + perc + lows
+    left, right = diffuse(dry, 90210)
+    left = dry * 0.70 + left * 0.50
+    right = dry * 0.70 + right * 0.50
 
     stereo = np.stack([left, right], axis=1)
-    # 头尾淡入淡出
-    fin = int(1.6 * SR)
-    fout = int(4.0 * SR)
+    fin = int(0.9 * SR)
+    fout = int(2.5 * SR)
     stereo[:fin] *= np.linspace(0, 1, fin)[:, None]
     stereo[-fout:] *= np.linspace(1, 0, fout)[:, None]
     peak = float(np.max(np.abs(stereo)))
     if peak > 0:
-        stereo = stereo / peak * 0.89
+        stereo = stereo / peak * 0.90
     return stereo
 
 
 def write_wav(path: Path, stereo: np.ndarray) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = np.clip(stereo, -1.0, 1.0)
-    ints = (data * 32767.0).astype("<i2")
+    ints = (np.clip(stereo, -1.0, 1.0) * 32767.0).astype("<i2")
     with wave.open(str(path), "wb") as w:
         w.setnchannels(2)
         w.setsampwidth(2)
@@ -161,11 +184,12 @@ def write_wav(path: Path, stereo: np.ndarray) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--seconds", type=float, default=186.0)
+    ap.add_argument("--seconds", type=float, default=62.0)
     ap.add_argument("--out", default="video/music.wav")
     args = ap.parse_args()
 
-    print(f"合成 {args.seconds:.0f}s 原创古风配乐（{BPM:.0f} BPM，D 宫五声）...", flush=True)
+    print(f"合成 {args.seconds:.0f}s 原创轻快轻音乐（{BPM:.0f} BPM，G 大调 I-V-vi-IV）...",
+          flush=True)
     stereo = build(args.seconds)
     p = Path(args.out)
     write_wav(p, stereo)

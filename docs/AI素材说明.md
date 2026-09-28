@@ -93,32 +93,33 @@ uv run tools/make_film.py --force                # 重出静帧（换 seed 就�
 | `video/氛围-帝京寻踪.mp4` | **氛围铺垫 10 幕**（41.5s，每幕带「明清名 → 今名」字幕） |
 | `video/开场-帝京寻踪.mp4` | 片头 + 氛围拼接（55.1s） |
 | `video/演示-帝京寻踪.mp4` | 真实页面截图合成演示片（34.9s，7 个操作状态） |
-| `video/正片-帝京寻踪.mp4` | **3 分钟正片**（181.4s / 1080p / 烧字幕 / 原创配乐，无配音） |
-| `video/正片字幕.srt` | 与正片时间轴对齐的字幕 |
+| `video/正片-帝京寻踪.mp4` | **60 秒正片**（60.0s / 1080p / 烧字幕 / 原创配乐，无配音） |
+| `video/正片字幕.srt` | **唯一一套字幕**，与正片时间轴对齐 |
 
 `video/` **不会**被 GitHub Pages 发布（workflow 只发布 `app/`、`data/places.json`、`data/routes.json`、`docs/`）。
 
-## 五、3 分钟正片（已生成，无配音）
+## 五、60 秒正片（已生成，无配音）
 
 三条脚本串成一条流水线：
 
-### `tools/make_music.py` —— 原创古风配乐（无版权顾虑）
+### `tools/make_music.py` —— 原创轻快轻音乐（无版权顾虑）
 ```powershell
-uv run tools/make_music.py --seconds 186 --out video/music.wav
+uv run tools/make_music.py --seconds 62 --out video/music.wav
 ```
-numpy 加法合成：拨弦音色（谐波叠加 + 各谐波不同衰减）+ 低音衬底 + 轻木击，
-尾部多抽头扩散当混响，D 宫五声 / 92 BPM。
+numpy 加法合成：马林巴质感的亮拨弦 + 柔和衷底 + 沙锤半拍 + 轻木击，
+尾部多抽头扩散当混响。**G 大调 I–V–vi–IV（G–D–Em–C）/ 112 BPM**，西式轻音乐而非中国风。
 **自己合成就不存在版权问题**，可以放心上传 B 站。
 
-### `tools/record_demo.py` —— 真屏幕录像（约 180s）
+### `tools/record_demo.py` —— 真屏幕录像（60s）
 ```powershell
 uv run tools/record_demo.py            # headful；地图走 WebGL，无头容易拿不到渲染
 uv run tools/record_demo.py --list-only
 ```
 用 Playwright 的 `record_video_dir` 上下文录制（**不是截图拼接**），
-脚本按绝对时间点驱动：全景平移 → 拉远看全城 → 三重筛选 → 点开憫忠寺 →
-逐段阅读详情 → 搜索 → 智能排线 3 方案 → 应用方案 + 混合模式 + 生成真实路线 → AI 导游 → 落版。
-同时写出 `video/正片字幕.srt` 与 `video/_timeline.json`（含片头加载耗时 `trim_start`）。
+脚本按**绝对时间点**驱动（不是 sleep 堆叠，所以字幕天然对齐）：
+全景推移 → 拉远看全城 → 双重筛选 → 点开憫忠寺 → 逐段阅读详情 →
+智能排线 3 方案 → 应用方案 + 混合模式 + 生成真实路线 → AI 导游 → 落版。
+同时写出 `video/正片字幕.srt`（**唯一一套字幕**）与 `video/_timeline.json`（含片头加载耗时 `trim_start`）。
 
 ### `tools/make_subs.py` —— SRT → ASS（修正字号）
 ```powershell
@@ -130,17 +131,18 @@ uv run tools/make_subs.py --srt video/正片字幕.srt --out video/subs.ass --si
 
 ### 最后合成
 ```powershell
-ffmpeg -y -ss 4.2 -i video/_raw.webm -i video/music.wav -filter_complex `
- "[0:v]ass=video/subs.ass[v];[1:a]volume=0.72,afade=t=in:st=0:d=1.5,afade=t=out:st=176:d=5[a]" `
+$trim = (Get-Content video/_timeline.json -Raw | ConvertFrom-Json).trim_start
+ffmpeg -y -ss $trim -i video/_raw.webm -i video/music.wav -filter_complex `
+ "[0:v]ass=video/subs.ass[v];[1:a]volume=0.78,afade=t=in:st=0:d=1.2,afade=t=out:st=56:d=4[a]" `
  -map "[v]" -map "[a]" -c:v libx264 -crf 19 -preset slow -r 25 -pix_fmt yuv420p `
- -c:a aac -b:a 192k -shortest "video/正片-帝京寻踪.mp4"
+ -c:a aac -b:a 192k -t 60 "video/正片-帝京寻踪.mp4"
 ```
-`-ss 4.2` = 剪掉地图加载那几秒（具体值见 `video/_timeline.json` 的 `trim_start`）。
-成品：181.4s / 1920×1080 / 25fps / 44 MB，音量 mean −17.2 dB、max −3.9 dB（纯音乐场景合适）。
+`-ss $trim` = 剪掉地图加载那几秒（值见 `video/_timeline.json`）；`-t 60` = 精确截到 60 秒。
+成品：**60.0s / 1920×1080 / 25fps / 20.6 MB**，音量 mean −17.1 dB、max −3.8 dB（纯音乐场景合适）。
 
-### 还要配人声时
-直接用 `video/正片字幕.srt` 当配音稿（`docs/配音稿.txt` 是同内容的纯文本版），
-人声进来后把配乐压到 −18 ~ −22 dB。
+### 字幕只保留一套
+全流程只有 `video/正片字幕.srt` 这一份字幕源（`subs.ass` 是由它派生，不单独维护）。
+要做人声版，直接用这份 SRT 当配音稿；人声进来后把配乐压到 −18 ~ −22 dB。
 
 ## 六、可复现性
 
