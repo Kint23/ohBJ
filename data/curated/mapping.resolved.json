@@ -1,0 +1,604 @@
+[
+ {
+  "entry": "太學石鼓",
+  "modern_name": "北京孔庙和国子监博物馆",
+  "address": "北京市东城区国子监街13号",
+  "wgs84": [
+   116.409,
+   39.9462
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "国子监-雍和宫",
+  "visit_minutes": 90,
+  "tags": [
+   "坛庙",
+   "教育",
+   "碑刻"
+  ],
+  "entry_simp": "太学石鼓",
+  "_entry_id": "djjwl-001",
+  "_guben": "石鼓"
+ },
+ {
+  "entry": "文丞相祠",
+  "modern_name": "文天祥祠",
+  "address": "北京市东城区府学胡同63号",
+  "wgs84": [
+   116.401,
+   39.9417
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "国子监-雍和宫",
+  "visit_minutes": 45,
+  "tags": [
+   "祠堂",
+   "忠烈"
+  ],
+  "entry_simp": "文丞相祠",
+  "_entry_id": "djjwl-002",
+  "_guben": "文丞相祠"
+ },
+ {
+  "entry": "水關",
+  "modern_name": "什刹海西海（水关旧址一带）",
+  "address": "北京市西城区德胜门西大街南侧、西海沿岸",
+  "wgs84": [
+   116.38,
+   39.943
+  ],
+  "precision": "area",
+  "confidence": "medium",
+  "cluster": "什刹海-钟鼓楼",
+  "visit_minutes": 60,
+  "tags": [
+   "河湖",
+   "园林"
+  ],
+  "entry_simp": "水关",
+  "_entry_id": "djjwl-003",
+  "_guben": null
+ },
+ {
+  "entry": "崇國寺",
+  "modern_name": "护国寺金刚殿（护国寺街）",
+  "address": "北京市西城区护国寺街",
+  "wgs84": [
+   116.3762,
+   39.9339
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "西四-白塔寺",
+  "visit_minutes": 30,
+  "tags": [
+   "寺院",
+   "异地异名"
+  ],
+  "entry_simp": "崇国寺",
+  "_entry_id": "djjwl-008",
+  "_guben": null
+ },
+ {
+  "entry": "十刹海",
+  "modern_name": "什刹海（前海）",
+  "address": "北京市西城区羊房胡同23号（前海）",
+  "wgs84": [
+   116.386,
+   39.937
+  ],
+  "precision": "area",
+  "confidence": "high",
+  "cluster": "什刹海-钟鼓楼",
+  "visit_minutes": 90,
+  "tags": [
+   "河湖",
+   "园林"
+  ],
+  "entry_simp": "十刹海",
+  "_entry_id": "djjwl-011",
+  "_guben": null
+ },
+ {
+  "entry": "火神廟",
+  "modern_name": "火德真君庙（火神庙）",
+  "address": "北京市西城区地安门外大街77号",
+  "wgs84": [
+   116.3941,
+   39.9334
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "什刹海-钟鼓楼",
+  "visit_minutes": 30,
+  "tags": [
+   "道观",
+   "坛庙"
+  ],
+  "entry_simp": "火神庙",
+  "_entry_id": "djjwl-013",
+  "_guben": "唐火神庙"
+ },
+ {
+  "entry": "大隆福寺",
+  "modern_name": "隆福寺街区（隆福大厦一带）",
+  "address": "北京市东城区隆福寺街",
+  "wgs84": [
+   116.4176,
+   39.9247
+  ],
+  "precision": "area",
+  "confidence": "medium",
+  "cluster": "东城-朝阳门",
+  "visit_minutes": 45,
+  "tags": [
+   "寺院",
+   "市集"
+  ],
+  "entry_simp": "大隆福寺",
+  "_entry_id": "djjwl-015",
+  "_guben": null
+ },
+ {
+  "entry": "于少保祠",
+  "modern_name": "于谦祠",
+  "address": "北京市东城区西裱褙胡同23号",
+  "wgs84": [
+   116.4172,
+   39.9067
+  ],
+  "precision": "point",
+  "confidence": "medium",
+  "cluster": "东单-崇文门",
+  "visit_minutes": 30,
+  "tags": [
+   "祠堂",
+   "忠烈"
+  ],
+  "entry_simp": "于少保祠",
+  "_entry_id": "djjwl-017",
+  "_guben": null
+ },
+ {
+  "entry": "燈市",
+  "modern_name": "灯市口大街",
+  "address": "北京市东城区灯市口大街",
+  "wgs84": [
+   116.4124,
+   39.9198
+  ],
+  "precision": "area",
+  "confidence": "medium",
+  "cluster": "东城-朝阳门",
+  "visit_minutes": 30,
+  "tags": [
+   "街市",
+   "岁时"
+  ],
+  "entry_simp": "灯市",
+  "_entry_id": "djjwl-022",
+  "_guben": null
+ },
+ {
+  "entry": "東嶽廟",
+  "modern_name": "北京东岳庙",
+  "address": "北京市朝阳区朝阳门外大街141号",
+  "wgs84": [
+   116.4425,
+   39.9245
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "东城-朝阳门",
+  "visit_minutes": 60,
+  "tags": [
+   "道观",
+   "碑刻"
+  ],
+  "entry_simp": "东岳庙",
+  "_entry_id": "djjwl-024",
+  "_guben": "东岳庙"
+ },
+ {
+  "entry": "金魚池",
+  "modern_name": "金鱼池（天坛北）",
+  "address": "北京市东城区金鱼池中街",
+  "wgs84": [
+   116.4022,
+   39.8863
+  ],
+  "precision": "area",
+  "confidence": "medium",
+  "cluster": "天坛-法源寺",
+  "visit_minutes": 20,
+  "tags": [
+   "河湖",
+   "民俗"
+  ],
+  "entry_simp": "金鱼池",
+  "_entry_id": "djjwl-032",
+  "_guben": null
+ },
+ {
+  "entry": "憫忠寺",
+  "modern_name": "法源寺",
+  "address": "北京市西城区法源寺前街7号",
+  "wgs84": [
+   116.3683,
+   39.8888
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "天坛-法源寺",
+  "visit_minutes": 60,
+  "tags": [
+   "寺院",
+   "异地异名"
+  ],
+  "entry_simp": "悯忠寺",
+  "_entry_id": "djjwl-039",
+  "_guben": null
+ },
+ {
+  "entry": "報國寺",
+  "modern_name": "报国寺",
+  "address": "北京市西城区广安门内大街报国寺前街1号",
+  "wgs84": [
+   116.363,
+   39.8917
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "城南-宣南",
+  "visit_minutes": 45,
+  "tags": [
+   "寺院",
+   "市集"
+  ],
+  "entry_simp": "报国寺",
+  "_entry_id": "djjwl-037",
+  "_guben": "报国寺"
+ },
+ {
+  "entry": "天寧寺",
+  "modern_name": "天宁寺塔",
+  "address": "北京市西城区天宁寺前街",
+  "wgs84": [
+   116.3392,
+   39.8961
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "城南-宣南",
+  "visit_minutes": 30,
+  "tags": [
+   "佛塔",
+   "辽金"
+  ],
+  "entry_simp": "天宁寺",
+  "_entry_id": "djjwl-048",
+  "_guben": "天宁寺塔"
+ },
+ {
+  "entry": "白雲觀",
+  "modern_name": "白云观",
+  "address": "北京市西城区白云观街9号",
+  "wgs84": [
+   116.3355,
+   39.9049
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "城南-宣南",
+  "visit_minutes": 60,
+  "tags": [
+   "道观",
+   "岁时"
+  ],
+  "entry_simp": "白云观",
+  "_entry_id": "djjwl-046",
+  "_guben": null
+ },
+ {
+  "entry": "盧溝橋",
+  "modern_name": "卢沟桥",
+  "address": "北京市丰台区卢沟桥城南街",
+  "wgs84": [
+   116.2145,
+   39.8493
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "西南郊",
+  "visit_minutes": 60,
+  "tags": [
+   "桥梁",
+   "河湖"
+  ],
+  "entry_simp": "卢沟桥",
+  "_entry_id": "djjwl-049",
+  "_guben": "卢沟桥"
+ },
+ {
+  "entry": "弘仁橋",
+  "modern_name": "马驹桥（碧霞元君庙旧址一带）",
+  "address": "北京市通州区马驹桥镇",
+  "wgs84": [
+   116.567,
+   39.756
+  ],
+  "precision": "area",
+  "confidence": "medium",
+  "cluster": "东南郊",
+  "visit_minutes": 30,
+  "tags": [
+   "桥梁",
+   "坛庙"
+  ],
+  "entry_simp": "弘仁桥",
+  "_entry_id": "djjwl-043",
+  "_guben": null
+ },
+ {
+  "entry": "白塔寺",
+  "modern_name": "妙应寺白塔",
+  "address": "北京市西城区阜成门内大街171号",
+  "wgs84": [
+   116.3595,
+   39.9233
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "西四-白塔寺",
+  "visit_minutes": 60,
+  "tags": [
+   "佛塔",
+   "寺院"
+  ],
+  "entry_simp": "白塔寺",
+  "_entry_id": "djjwl-062",
+  "_guben": "白塔寺"
+ },
+ {
+  "entry": "帝王廟",
+  "modern_name": "历代帝王庙",
+  "address": "北京市西城区阜成门内大街131号",
+  "wgs84": [
+   116.3625,
+   39.9235
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "西四-白塔寺",
+  "visit_minutes": 60,
+  "tags": [
+   "坛庙",
+   "教育"
+  ],
+  "entry_simp": "帝王庙",
+  "_entry_id": "djjwl-061",
+  "_guben": null
+ },
+ {
+  "entry": "天主堂",
+  "modern_name": "宣武门天主堂（南堂）",
+  "address": "北京市西城区前门西大街141号",
+  "wgs84": [
+   116.3756,
+   39.8993
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "宣武门-西单",
+  "visit_minutes": 30,
+  "tags": [
+   "教堂",
+   "西学东渐"
+  ],
+  "entry_simp": "天主堂",
+  "_entry_id": "djjwl-051",
+  "_guben": null
+ },
+ {
+  "entry": "萬松老人塔",
+  "modern_name": "万松老人塔",
+  "address": "北京市西城区西四南大街43号（砖塔胡同口）",
+  "wgs84": [
+   116.3767,
+   39.9215
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "西四-白塔寺",
+  "visit_minutes": 20,
+  "tags": [
+   "佛塔",
+   "金石"
+  ],
+  "entry_simp": "万松老人塔",
+  "_entry_id": "djjwl-059",
+  "_guben": null
+ },
+ {
+  "entry": "城隍廟市",
+  "modern_name": "都城隍庙大殿",
+  "address": "北京市西城区成方街33号",
+  "wgs84": [
+   116.3645,
+   39.9095
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "宣武门-西单",
+  "visit_minutes": 20,
+  "tags": [
+   "坛庙",
+   "市集"
+  ],
+  "entry_simp": "城隍庙市",
+  "_entry_id": "djjwl-055",
+  "_guben": null
+ },
+ {
+  "entry": "高梁橋",
+  "modern_name": "高梁桥",
+  "address": "北京市海淀区西直门外高梁桥",
+  "wgs84": [
+   116.344,
+   39.943
+  ],
+  "precision": "point",
+  "confidence": "medium",
+  "cluster": "长河-紫竹院",
+  "visit_minutes": 30,
+  "tags": [
+   "桥梁",
+   "河湖",
+   "岁时"
+  ],
+  "entry_simp": "高梁桥",
+  "_entry_id": "djjwl-064",
+  "_guben": "高梁桥"
+ },
+ {
+  "entry": "萬壽寺",
+  "modern_name": "万寿寺（北京艺术博物馆）",
+  "address": "北京市海淀区西三环北路万寿寺",
+  "wgs84": [
+   116.3095,
+   39.9455
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "长河-紫竹院",
+  "visit_minutes": 60,
+  "tags": [
+   "寺院",
+   "园林"
+  ],
+  "entry_simp": "万寿寺",
+  "_entry_id": "djjwl-069",
+  "_guben": "万寿寺"
+ },
+ {
+  "entry": "真覺寺",
+  "modern_name": "真觉寺金刚宝座塔（五塔寺）",
+  "address": "北京市海淀区五塔寺村24号（北京石刻艺术博物馆）",
+  "wgs84": [
+   116.3257,
+   39.9449
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "长河-紫竹院",
+  "visit_minutes": 60,
+  "tags": [
+   "佛塔",
+   "石刻",
+   "西学东渐"
+  ],
+  "entry_simp": "真觉寺",
+  "_entry_id": "djjwl-068",
+  "_guben": null
+ },
+ {
+  "entry": "慈壽寺",
+  "modern_name": "慈寿寺塔（玲珑塔）",
+  "address": "北京市海淀区八里庄慈寿寺塔",
+  "wgs84": [
+   116.2905,
+   39.9385
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "长河-紫竹院",
+  "visit_minutes": 30,
+  "tags": [
+   "佛塔"
+  ],
+  "entry_simp": "慈寿寺",
+  "_entry_id": "djjwl-076",
+  "_guben": "慈寿寺"
+ },
+ {
+  "entry": "香山寺",
+  "modern_name": "香山寺",
+  "address": "北京市海淀区香山公园内",
+  "wgs84": [
+   116.1877,
+   39.9915
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "西山-香山",
+  "visit_minutes": 60,
+  "tags": [
+   "寺院",
+   "山林"
+  ],
+  "entry_simp": "香山寺",
+  "_entry_id": "djjwl-081",
+  "_guben": null
+ },
+ {
+  "entry": "碧雲寺",
+  "modern_name": "碧云寺",
+  "address": "北京市海淀区香山公园北门东侧",
+  "wgs84": [
+   116.1835,
+   39.9955
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "西山-香山",
+  "visit_minutes": 60,
+  "tags": [
+   "寺院",
+   "山林"
+  ],
+  "entry_simp": "碧云寺",
+  "_entry_id": "djjwl-082",
+  "_guben": null
+ },
+ {
+  "entry": "臥佛寺",
+  "modern_name": "十方普觉寺（卧佛寺）",
+  "address": "北京市海淀区北京植物园内",
+  "wgs84": [
+   116.1915,
+   40.004
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "西山-香山",
+  "visit_minutes": 60,
+  "tags": [
+   "寺院",
+   "山林"
+  ],
+  "entry_simp": "卧佛寺",
+  "_entry_id": "djjwl-084",
+  "_guben": null
+ },
+ {
+  "entry": "潭柘寺",
+  "modern_name": "潭柘寺",
+  "address": "北京市门头沟区潭柘寺镇",
+  "wgs84": [
+   116.028,
+   39.903
+  ],
+  "precision": "point",
+  "confidence": "high",
+  "cluster": "西山-门头沟",
+  "visit_minutes": 120,
+  "tags": [
+   "寺院",
+   "山林"
+  ],
+  "entry_simp": "潭柘寺",
+  "_entry_id": "djjwl-098",
+  "_guben": "潭柘寺"
+ }
+]

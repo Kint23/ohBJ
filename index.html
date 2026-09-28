@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>帝京寻踪 · 明代北京古今地图</title>
+<link rel="stylesheet" href="app/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="seal">帝京</span>
+    <div>
+      <h1>帝京寻踪</h1>
+      <p>以明·刘侗《帝京景物略》为骨，把四百年前的北京叠回今天的地图</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <input id="q" type="search" placeholder="搜地名 · 诗题 · 作者（如：石鼓、于谦、香山）" />
+    <select id="mode">
+      <option value="browse">浏览模式</option>
+      <option value="route">行程模式</option>
+    </select>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- 左侧栏 -->
+  <aside class="sidebar">
+    <section class="panel">
+      <h2>按卷次</h2>
+      <div id="volumeFilter" class="chips"></div>
+    </section>
+
+    <section class="panel">
+      <h2>按类型</h2>
+      <div id="tagFilter" class="chips"></div>
+    </section>
+
+    <section class="panel">
+      <h2>按步行圈</h2>
+      <div id="clusterFilter" class="chips"></div>
+    </section>
+
+    <section class="panel" id="p3Panel">
+      <h2>智能排线 · 3 个方案</h2>
+      <label class="row"><span>可用时长</span>
+        <select id="p3Dur">
+          <option value="180">半日（3 小时）</option>
+          <option value="420" selected>一日（7 小时）</option>
+          <option value="900">两日（15 小时）</option>
+          <option value="1440">三日（24 小时）</option>
+        </select>
+      </label>
+      <label class="row"><span>兴趣</span>
+        <select id="p3Tag"><option value="">不限</option></select>
+      </label>
+      <label class="row"><span>出行方式</span>
+        <select id="p3Mode">
+          <option value="walking" selected>步行</option>
+          <option value="riding">骑行</option>
+          <option value="driving">驾车</option>
+          <option value="transit">公交</option>
+          <option value="mixed">混合（按距离自动）</option>
+        </select>
+      </label>
+      <button id="p3Btn" class="btn primary">生成 3 个方案</button>
+      <div id="p3Out"></div>
+    </section>
+
+    <section class="panel" id="routePanel" hidden>
+      <h2>行程</h2>
+      <div id="routeList" class="route-list"></div>
+      <label class="row"><span>出行方式</span>
+        <select id="routeMode">
+          <option value="mixed">混合（按距离自动）</option>
+          <option value="walking">步行</option>
+          <option value="riding">骑行</option>
+          <option value="driving">驾车</option>
+          <option value="transit">公交</option>
+        </select>
+      </label>
+      <button id="planBtn" class="btn primary" disabled>生成路线（真实里程）</button>
+      <div id="routeResult" class="route-result"></div>
+    </section>
+
+    <section class="panel">
+      <h2>地点 <span id="count" class="muted"></span></h2>
+      <ul id="placeList" class="place-list"></ul>
+    </section>
+  </aside>
+
+  <!-- 地图 -->
+  <main class="map-wrap">
+    <div id="map"></div>
+    <div class="legend">
+      <strong>图例</strong>
+      <span><i class="dot high"></i>坐标可信（高）</span>
+      <span><i class="dot medium"></i>坐标待核（中）</span>
+      <span><i class="dot area"></i>范围地名（已湮／占地较广）</span>
+      <span class="muted">坐标：BD-09 ｜ 底图 © 百度地图</span>
+    </div>
+    <div id="mapNotice" class="notice" hidden></div>
+  </main>
+
+  <!-- 右侧详情 -->
+  <aside class="detail" id="detail">
+    <div class="detail-empty">
+      <h2>选择一处古迹</h2>
+      <p>地图上的每个标记，都对应《帝京景物略》里的一个"目"。</p>
+      <p class="muted">点击标记，可看到<b>明清地名 → 今日地名</b>、原文摘录、关联诗词、白话今译，以及清人《京城古迹考》对该地的实地核访。</p>
+      <div class="facts">
+        <div><b id="statPlaces">–</b><span>明代地点</span></div>
+        <div><b id="statPoems">–</b><span>关联诗篇</span></div>
+        <div><b id="statNotes">–</b><span>清代核访</span></div>
+      </div>
+      <p class="muted small">数据来源：《帝京景物略》（1635）、《京城古迹考》、《日下舊聞考》。古籍原文属公有领域；今译为 AI 辅助译文，仅供参考。</p>
+    </div>
+  </aside>
+
+</div>
+
+<!-- ===== 明代北京城 AI 导游 ===== -->
+<button id="gxToggle" class="gx-toggle" type="button">问问导游</button>
+
+<section id="gx" class="gx" hidden aria-label="明代北京城 AI 导游">
+  <header class="gx-head">
+    <div class="gx-head-txt">
+      <b>明代北京城 AI 导游</b>
+      <span>基于《帝京景物略》30 处古迹 · 127 目语料</span>
+    </div>
+    <button id="gxClose" type="button" title="收起">×</button>
+  </header>
+  <div id="gxMsg" class="gx-msg"></div>
+  <div id="gxChips" class="gx-chips"></div>
+  <form id="gxForm" class="gx-form" autocomplete="off">
+    <input id="gxInput" type="text" placeholder="例：半天想逛寺庙，怎么走？" />
+    <button type="submit">发送</button>
+  </form>
+</section>
+
+<script src="app/config.js"></script>
+<!-- 地图 API 由 app/app.js 异步注入：AK 未填或 CDN 不可达时，页面其余部分仍可用 -->
+<script src="app/app.js"></script>
+<script src="app/planner.js"></script>
+<script src="app/verify.js"></script>
+<script src="app/guide.js"></script>
+</body>
+</html>

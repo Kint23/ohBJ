@@ -1,0 +1,47 @@
+name: Deploy demo to GitHub Pages
+
+# 推送到 main 即自动部署；也可在 Actions 页手动触发
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # 只发布演示真正需要的文件：
+      # 排除古籍原文 txt（~7MB）、中间产物 entries.json/guben.json（~1MB）、脚本与策划源文件
+      - name: Stage site
+        run: |
+          set -e
+          mkdir -p _site/data
+          cp index.html _site/
+          cp -r app _site/app
+          cp data/places.json data/routes.json _site/data/
+          cp README.md _site/README.md
+          if [ -d docs ]; then cp -r docs _site/docs; fi
+          touch _site/.nojekyll
+          echo "--- staged ---"
+          find _site -type f | sort
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4

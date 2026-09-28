@@ -1,0 +1,380 @@
+{
+  "_comment": "行程分档。stops 用 places.json 的 ming_name 关联。est_km = 相邻站点直线距离之和（规范见 meta.est_km_semantics）；页面会用百度地图『步行路线规划』给出真实里程与耗时。",
+  "meta": {
+    "walk_speed_kmh": 4.2,
+    "est_km_semantics": "est_km = 相邻站点直线距离之和（可用 tools/validate.py 复现），实际里程约为其 1.2~1.4 倍。travel_minutes = 按该天 mode（walking/riding/driving/transit）与 1.3 路网系数估算的纯交通耗时，公交另加 8 分/段等车。二者均由 tools/sync_routes.py 从 places.json 的真实坐标自动生成，不要手改；页面上的『生成路线』会用百度路线规划给出真实值。",
+    "note": "停留时长为建议值；含参观、拍照、休息。实际以现场为准。"
+  },
+  "walk_circles": [
+    {
+      "id": "c1",
+      "name": "什刹海环湖",
+      "est_km": 1.9,
+      "hours": 3.5,
+      "theme": "水关·北湖·园林",
+      "stops": [
+        "火神廟",
+        "十刹海",
+        "水關"
+      ]
+    },
+    {
+      "id": "c2",
+      "name": "国子监书香",
+      "est_km": 2.4,
+      "hours": 4.0,
+      "theme": "石鼓·忠烈·梵刹",
+      "stops": [
+        "太學石鼓",
+        "文丞相祠",
+        "大隆福寺"
+      ]
+    },
+    {
+      "id": "c3",
+      "name": "西四白塔",
+      "est_km": 2.7,
+      "hours": 3.5,
+      "theme": "白塔·帝王庙·旧寺",
+      "stops": [
+        "萬松老人塔",
+        "白塔寺",
+        "帝王廟",
+        "崇國寺"
+      ]
+    },
+    {
+      "id": "c4",
+      "name": "宣南古刹",
+      "est_km": 3.5,
+      "hours": 4.5,
+      "theme": "双塔·道观·书市",
+      "stops": [
+        "天寧寺",
+        "白雲觀",
+        "報國寺",
+        "憫忠寺"
+      ]
+    },
+    {
+      "id": "c5",
+      "name": "长河寺塔",
+      "est_km": 5.8,
+      "hours": 5.0,
+      "theme": "沿长河·寺塔连缀",
+      "stops": [
+        "慈壽寺",
+        "萬壽寺",
+        "真覺寺",
+        "高梁橋"
+      ]
+    },
+    {
+      "id": "c6",
+      "name": "西山三寺",
+      "est_km": 2.9,
+      "hours": 4.0,
+      "theme": "山林·泉石·古寺",
+      "stops": [
+        "香山寺",
+        "碧雲寺",
+        "臥佛寺"
+      ]
+    },
+    {
+      "id": "c7",
+      "name": "东城香火",
+      "est_km": 6.0,
+      "hours": 4.5,
+      "theme": "灯市·东岳庙·于谦祠",
+      "stops": [
+        "燈市",
+        "大隆福寺",
+        "東嶽廟",
+        "于少保祠"
+      ]
+    },
+    {
+      "id": "c8",
+      "name": "皇城以南",
+      "est_km": 6.4,
+      "hours": 3.0,
+      "theme": "西洋教堂·都城隍·金鱼池",
+      "stops": [
+        "天主堂",
+        "城隍廟市",
+        "金魚池"
+      ]
+    }
+  ],
+  "itineraries": [
+    {
+      "id": "d2",
+      "name": "2 日版 · 中轴与宣南",
+      "days": 2,
+      "stops_total": 12,
+      "est_km": 16.4,
+      "themes": [
+        "中轴北段",
+        "什刹海",
+        "国子监",
+        "西四白塔",
+        "宣南古刹"
+      ],
+      "plan": [
+        {
+          "day": 1,
+          "title": "第 1 天 · 钟鼓楼—什刹海—国子监",
+          "est_km": 7.5,
+          "stops": [
+            {
+              "ming_name": "火神廟",
+              "stay": 30,
+              "transit": "起点：地铁 8 号线什刹海站 A 口"
+            },
+            {
+              "ming_name": "十刹海",
+              "stay": 60,
+              "transit": "步行 0.8 km / 约 12 分（沿前海西岸）"
+            },
+            {
+              "ming_name": "水關",
+              "stay": 45,
+              "transit": "步行 1.0 km / 约 15 分（后海北沿）"
+            },
+            {
+              "ming_name": "太學石鼓",
+              "stay": 90,
+              "transit": "步行 2.6 km / 约 38 分或骑行 12 分（德胜门内大街→雍和宫）"
+            },
+            {
+              "ming_name": "文丞相祠",
+              "stay": 45,
+              "transit": "步行 0.8 km / 约 12 分（府学胡同）"
+            },
+            {
+              "ming_name": "大隆福寺",
+              "stay": 45,
+              "transit": "步行 2.0 km / 约 29 分或公交 2 站"
+            }
+          ],
+          "travel_minutes": 139
+        },
+        {
+          "day": 2,
+          "title": "第 2 天 · 西四白塔—宣南古刹",
+          "est_km": 8.9,
+          "stops": [
+            {
+              "ming_name": "萬松老人塔",
+              "stay": 20,
+              "transit": "起点：地铁 4 号线西四站 D 口"
+            },
+            {
+              "ming_name": "白塔寺",
+              "stay": 60,
+              "transit": "步行 0.6 km / 约 9 分（阜内大街）"
+            },
+            {
+              "ming_name": "帝王廟",
+              "stay": 60,
+              "transit": "步行 0.3 km / 约 5 分"
+            },
+            {
+              "ming_name": "崇國寺",
+              "stay": 30,
+              "transit": "步行 1.2 km / 约 17 分（护国寺街）"
+            },
+            {
+              "ming_name": "報國寺",
+              "stay": 45,
+              "transit": "步行 3.4 km / 约 49 分或公交 4 站（广安门内大街）"
+            },
+            {
+              "ming_name": "憫忠寺",
+              "stay": 60,
+              "transit": "步行 1.5 km / 约 21 分（牛街→法源寺）"
+            }
+          ],
+          "travel_minutes": 165
+        }
+      ],
+      "notes": "2 日版只走城内，全程强步行可达，适合周末。第 2 天下午可在牛街用餐。"
+    },
+    {
+      "id": "d3",
+      "name": "3 日版 · 加长河寺塔",
+      "days": 3,
+      "stops_total": 16,
+      "est_km": 22.2,
+      "themes": [
+        "2 日版全部",
+        "长河寺塔",
+        "西直门外"
+      ],
+      "plan": [
+        {
+          "day": 1,
+          "title": "第 1 天 · 钟鼓楼—什刹海—国子监",
+          "est_km": 7.5,
+          "reuse": "d2.day1",
+          "travel_minutes": 139
+        },
+        {
+          "day": 2,
+          "title": "第 2 天 · 西四白塔—宣南古刹",
+          "est_km": 8.9,
+          "reuse": "d2.day2",
+          "travel_minutes": 165
+        },
+        {
+          "day": 3,
+          "title": "第 3 天 · 长河寺塔（阜成门—西直门外）",
+          "est_km": 5.8,
+          "stops": [
+            {
+              "ming_name": "慈壽寺",
+              "stay": 30,
+              "transit": "起点：地铁 6 号线慈寿寺站"
+            },
+            {
+              "ming_name": "萬壽寺",
+              "stay": 60,
+              "transit": "步行 1.9 km / 约 27 分（沿长河南岸）"
+            },
+            {
+              "ming_name": "真覺寺",
+              "stay": 60,
+              "transit": "步行 1.4 km / 约 20 分（过紫竹院）"
+            },
+            {
+              "ming_name": "高梁橋",
+              "stay": 30,
+              "transit": "步行 1.6 km / 约 23 分（长河北岸→西直门）"
+            }
+          ],
+          "travel_minutes": 108
+        }
+      ],
+      "notes": "第 3 天沿长河而行，紫竹院—万寿寺一段是明代踏青路线的原径。"
+    },
+    {
+      "id": "d5",
+      "name": "5 日版 · 全域（含西山）",
+      "days": 5,
+      "stops_total": 28,
+      "est_km": 54.9,
+      "themes": [
+        "城内全走",
+        "长河",
+        "东城香火",
+        "西山三寺",
+        "潭柘寺"
+      ],
+      "plan": [
+        {
+          "day": 1,
+          "title": "第 1 天 · 钟鼓楼—什刹海—国子监",
+          "est_km": 7.5,
+          "reuse": "d2.day1",
+          "travel_minutes": 139
+        },
+        {
+          "day": 2,
+          "title": "第 2 天 · 西四白塔—宣南古刹",
+          "est_km": 8.9,
+          "reuse": "d2.day2",
+          "travel_minutes": 165
+        },
+        {
+          "day": 3,
+          "title": "第 3 天 · 长河寺塔",
+          "est_km": 5.8,
+          "reuse": "d3.day3",
+          "travel_minutes": 108
+        },
+        {
+          "day": 4,
+          "title": "第 4 天 · 东城香火与皇城以南",
+          "mode": "transit",
+          "est_km": 11.1,
+          "stops": [
+            {
+              "ming_name": "燈市",
+              "stay": 30,
+              "transit": "起点：地铁 5 号线灯市口站"
+            },
+            {
+              "ming_name": "東嶽廟",
+              "stay": 60,
+              "transit": "步行 2.6 km / 约 37 分（朝阳门内大街）"
+            },
+            {
+              "ming_name": "于少保祠",
+              "stay": 30,
+              "transit": "步行 2.5 km / 约 36 分（建国门内→东单，或地铁 2 号线 2 站）"
+            },
+            {
+              "ming_name": "天主堂",
+              "stay": 30,
+              "transit": "地铁 2 号线 2 站（东单→宣武门），出站即到"
+            },
+            {
+              "ming_name": "城隍廟市",
+              "stay": 20,
+              "transit": "步行 1.5 km / 约 21 分（成方街）"
+            }
+          ],
+          "travel_minutes": 56
+        },
+        {
+          "day": 5,
+          "title": "第 5 天 · 西山三寺与潭柘寺",
+          "mode": "driving",
+          "est_km": 21.6,
+          "stops": [
+            {
+              "ming_name": "香山寺",
+              "stay": 60,
+              "transit": "起点：香山公园内（建议自驾或西郊线）"
+            },
+            {
+              "ming_name": "碧雲寺",
+              "stay": 60,
+              "transit": "步行 0.8 km / 约 12 分（香山北门东侧）"
+            },
+            {
+              "ming_name": "臥佛寺",
+              "stay": 60,
+              "transit": "步行 1.4 km / 约 20 分（植物园内）"
+            },
+            {
+              "ming_name": "潭柘寺",
+              "stay": 120,
+              "transit": "自驾 25 km / 约 45 分（门头沟）"
+            }
+          ],
+          "travel_minutes": 77
+        }
+      ],
+      "notes": "第 4 天以地铁 2 号线串联东城与宣武门，避免长距离步行。第 5 天距离远、部分为山道，建议自驾。另有 3 处外围可作加游：卢沟桥、金鱼池、弘仁桥/马驹桥。",
+      "addons": [
+        {
+          "ming_name": "盧溝橋",
+          "stay": 60,
+          "transit": "半日 · 地铁 14 号线园博园站转公交"
+        },
+        {
+          "ming_name": "金魚池",
+          "stay": 20,
+          "transit": "半日 · 地铁 7 号线桥湾站，天坛北侧"
+        },
+        {
+          "ming_name": "弘仁橋",
+          "stay": 30,
+          "transit": "半日 · 亦庄线同济南路站转公交"
+        }
+      ]
+    }
+  ]
+}
