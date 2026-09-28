@@ -142,6 +142,20 @@ docs/
      ② 两个策略可能退化成同一条线（3 个方案变 2 个）→ 按签名去重并回退到次优种子；
      ③ 为凑满 3 个而拿 1 站方案充数没意义 → 加最少 2 站的阀值，宁可只给 2 个。
 
+### 用到的百度地图能力一览
+
+| 能力 | 调用处 | 用途 |
+|---|---|---|
+| JSAPI GL 地图底座 | `BMapGL.Map` / `Point` / `ScaleControl` | 底图、中心与缩放、比例尺 |
+| 覆盖物 | `BMapGL.Marker` / `Label` / `Circle` / `Polyline` / `InfoWindow` | 30 处标记与标注、已湮灭地名的范围圈、行程连线与编号、详情气泡 |
+| 周边检索 | `BMapGL.LocalSearch.searchNearby(kw, pt, 1000)` | 一键找附近餐饮 / 厕所（1 km 内） |
+| 地理编码（端内） | `BMapGL.Geocoder` | 核验面板：地址 → 坐标，偏差 < 3 km 自动写回并标记「已核验」 |
+| 路线规划 | `BMapGL.WalkingRoute` / `RidingRoute` / `DrivingRoute` / `TransitRoute` | 步行 / 骑行 / 驾车 / 公交 / 混合，取真实里程与耗时 |
+| WebAPI 地点检索 | `place/v2/search` | 离线流水线回核 30 处坐标（30/30 命中） |
+| WebAPI 地理编码 | `geocoding/v3/` | 离线把今名地址解析成经纬度 |
+
+> 坐标换算链 **WGS-84 → GCJ-02 → BD-09** 由本地脚本完成，不消耗线上配额。
+
 ---
 
 ## 五、合规章节
