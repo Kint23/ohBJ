@@ -30,6 +30,7 @@ video/开场-*.mp4
 
 # 正片的中间产物（可由 tools/ 重建）
 video/_raw.webm
+video/_frames/
 video/_timeline.json
 video/music.wav
 video/subs.ass

@@ -65,6 +65,31 @@ def parse_srt(text: str) -> list[tuple[str, str, str]]:
     return out
 
 
+def ass_time(t: float) -> str:
+    """秒 -> ASS 的 h:mm:ss.cc（百分秒）。"""
+    total = int(round(t * 100))
+    cs = total % 100
+    total //= 100
+    s = total % 60
+    m = total // 60 % 60
+    h = total // 3600
+    return f"{h:d}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def write_ass(subs, out, *, width: int = 1920, height: int = 1080,
+              font: str = "KaiTi", size: int = 46, pad: float = 8.0,
+              margin_v: int = 66) -> Path:
+    """subs = [(start_sec, end_sec, text), ...] -> 带正确 PlayRes 的 ASS 文件。"""
+    head = HEADER.format(w=width, h=height, font=font, size=size,
+                         pad=pad, mv=margin_v)
+    lines = [f"Dialogue: 0,{ass_time(a)},{ass_time(b)},Default,,0,0,0,,{t}"
+             for a, b, t in subs]
+    p = Path(out)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(head + "\n".join(lines) + "\n", encoding="utf-8")
+    return p
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--srt", default="video/正片字幕.srt")

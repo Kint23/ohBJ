@@ -93,7 +93,7 @@ uv run tools/make_film.py --force                # 重出静帧（换 seed 就�
 | `video/氛围-帝京寻踪.mp4` | **氛围铺垫 10 幕**（41.5s，每幕带「明清名 → 今名」字幕） |
 | `video/开场-帝京寻踪.mp4` | 片头 + 氛围拼接（55.1s） |
 | `video/演示-帝京寻踪.mp4` | 真实页面截图合成演示片（34.9s，7 个操作状态） |
-| `video/正片-帝京寻踪.mp4` | **60 秒正片**（60.0s / 1080p / **字幕已内嵌** / 原创配乐，无配音） |
+| `video/正片-帝京寻踪.mp4` | **60 秒正片**（60.0s / 1080p / 5.2 Mbps / **字幕已内嵌** / 原创配乐，无配音） |
 
 > 字幕**只保留内嵌这一份**，不再另存外挂 SRT。需要时可随时用
 > `uv run tools/record_demo.py --srt-only` 从代码里的时间轴重新导出。
@@ -114,16 +114,26 @@ numpy 加法合成：马林巴质感的亮拨弦 + 柔和衷底 + 沙锤半拍 +
 
 ### `tools/record_demo.py` —— 真屏幕录像（60s）
 ```powershell
-uv run tools/record_demo.py            # headful；地图走 WebGL，无头容易拿不到渲染
-uv run tools/record_demo.py --list-only
+uv run tools/record_demo.py                          # 录 + 直接出成片（CDP 采集，CRF 15）
+uv run tools/record_demo.py --crf 12                 # 想要更大更清
+uv run tools/record_demo.py --keep-frames            # 采集帧留下（~300 MB），便于换 CRF
+uv run tools/record_demo.py --encode-only --crf 12   # 复用帧重编码，不重录
+uv run tools/record_demo.py --probe                  # 只自检交互，不录像
+uv run tools/record_demo.py --list-only              # 只打印时间轴
 ```
-用 Playwright 的 `record_video_dir` 上下文录制（**不是截图拼接**），
 脚本按**绝对时间点**驱动（不是 sleep 堆叠，所以字幕天然对齐）：
 全景推移 → 拉远看全城 → 筛选（`三·城南內外` + `寺院`，30→2）→ 点开盧溝橋 →
 逐段阅读 **白话今译 / 原书记载 / 关联诗篇（展开）/ 清人实地核访** →
 智能排线 3 方案 → 应用方案 + 混合模式 + 生成真实路线 → AI 导游 → 落版。
-同时写出 `video/_timeline.json`（含片头加载耗时 `trim_start`）；
 字幕文本只存在代码里的 `SUBS` 列表，要改就改那里。
+
+**采集方式演进（清晰度的关键）**：最初用 Playwright 的 `record_video_dir`，
+但它的 VP8 编码**固定只有 ~0.83 Mbps**，1080p 的文字与地图细节被压糊；
+后面再高码率重编码只是把这个「糊」原样搬运，补不回细节。
+现改为 **CDP `Page.startScreencast`**（JPEG q90）逐帧抓图，按**真实时间戳**编码：
+平均 410 KB/帧 ≈ 26 Mbps 等效，源头质量提高一个量级。
+代价：Chrome 的投射频率只有 **~13 fps**（成片仍输出 25 fps；静态画面无影响，
+只有地图平移时略欠顺滑）。想回退旧方式用 `--capture video`。
 
 录制前先跑 `uv run tools/record_demo.py --probe` 自检，能省一次白录。三个已踩过的坑：
 
@@ -143,16 +153,25 @@ uv run tools/make_subs.py --srt video/正片字幕.srt --out video/subs.ass --si
 于是 `force_style` 里的 FontSize 会被放大 1080/288 ≈ 3.75 倍（字大得离谱）。
 自己写 ASS 显式声明 `PlayResX/Y = 1920/1080`，字号就是像素。
 
-### 最后合成
-```powershell
-$trim = (Get-Content video/_timeline.json -Raw | ConvertFrom-Json).trim_start
-ffmpeg -y -ss $trim -i video/_raw.webm -i video/music.wav -filter_complex `
- "[0:v]ass=video/subs.ass[v];[1:a]volume=0.78,afade=t=in:st=0:d=1.2,afade=t=out:st=56:d=4[a]" `
- -map "[v]" -map "[a]" -c:v libx264 -crf 19 -preset slow -r 25 -pix_fmt yuv420p `
- -c:a aac -b:a 192k -t 60 "video/正片-帝京寻踪.mp4"
-```
-`-ss $trim` = 剪掉地图加载那几秒（值见 `video/_timeline.json`）；`-t 60` = 精确截到 60 秒。
-成品：**60.0s / 1920×1080 / 25fps / 20.6 MB**，音量 mean −17.1 dB、max −3.8 dB（纯音乐场景合适）。
+### 编码（已内置在脚本里，不需手跑 ffmpeg）
+`record_demo.py` 按真实时间戳把 JPEG 帧写成 concat 清单，再一次性烧字幕 + 混音。
+
+| CRF | 大致码率 | 60 秒体积 | 说明 |
+|---|---|---|---|
+| 18 | ~3 Mbps | ~23 MB | 偏小 |
+| **15** | **5.2 Mbps** | **37 MB** | **当前默认，已接近采集源的信息量** |
+| 12 | ~9 Mbps | ~65 MB | 收益有限（估算） |
+| 10 | ~14 Mbps | ~100 MB | 基本无意义（估算） |
+
+实测：**60.0s / 1920×1080 / 25fps / 37.3 MB / 5.2 Mbps**，
+音量 mean −17.1 dB、max −3.8 dB（纯音乐场景合适）。
+
+**为什么不再往上堆码率**：源头是 JPEG q90（≈410 KB/帧），
+CRF 15 已接近它的实际信息量，再降 CRF 主要是把 JPEG 的块状噪点也精确编码一遍。
+真想更清，应该提高采集质量（`--quality 95`）而不是改 CRF。
+
+> 踩坑：ffmpeg 滤镜参数里的路径**不能带盘符冒号**（`C:` 会被当成选项分隔符，
+> 报 `Unable to parse "original_size"`）。脚本里的 `filter_path()` 会尽量转成相对路径。
 
 ### 字幕只有一份：内嵌
 成片里的字幕是**烧进画面**的（楷体 46px），不再另存外挂 SRT。

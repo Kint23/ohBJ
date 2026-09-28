@@ -2,34 +2,48 @@
 # requires-python = ">=3.10"
 # dependencies = ["playwright"]
 # ///
-"""用 Playwright 的**上下文录制**真录 60 秒正片（不是截图拼接）。
+"""抓高质量帧，合成 60 秒正片（1920x1080），字幕直接烧入。
 
-    uv run tools/record_demo.py                 # 录制约 60s，headful（地图 GL 需要）
-    uv run tools/record_demo.py --list-only     # 只打印时间轴，不录制
+为什么不用 Playwright 内置的 `record_video_dir`：
+  它的 VP8 编码固定只有 **~0.8 Mbps**，1080p 的文字与地图细节会被压糊；
+  后面再高码率重编码只是把这个"糊"原样搬运，补不回细节。
+  改用 CDP `Page.startScreencast`（JPEG q95）逐帧抓图，按**真实时间戳**编码，
+  源头质量提高一个量级，成片才真的清晰。
+
+用法：
+  uv run tools/record_demo.py                  # 录制 + 直接出成片（CDP 采集）
+  uv run tools/record_demo.py --capture video  # 退回 Playwright 内置录制（旧行为）
+  uv run tools/record_demo.py --probe          # 只自检交互，不录像
+  uv run tools/record_demo.py --list-only      # 只打印时间轴
+  uv run tools/record_demo.py --srt-only       # 只导出字幕（不录像）
 
 产出：
-  video/_raw.webm        原始录像（1920x1080）
-  video/_timeline.json    各步骤时间戳与片头修剪量
-
-字幕最终是**烧进成片**的，不随仓库另存外挂 SRT；
-需要时用 `--srt-only` 从本文件里的 SUBS 时间轴单独导出（不录像）。
+  video/正片-帝京寻踪.mp4    成片（字幕已烧入）
+  video/_timeline.json      各步骤时间戳与片头修剪量
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.stdout.reconfigure(errors="replace")
 
+import make_subs  # noqa: E402
+
 W, H = 1920, 1080
-VIDEO_EXTRA_TAIL = 2.0
+FPS = 25
 END_AT = 60.0
+EXTRA_TAIL = 2.0
 
 # 时间轴：秒 -> 字幕（指"片头修剪后"的成片时间）
 SUBS = [
@@ -48,8 +62,7 @@ SUBS = [
     (55.0, "也可以直接问「明代北京城 AI 导游」"),
 ]
 
-# 目标地点：要有白话今译 + 原书记载 + 很多关联诗篇 + 清人实地核访（四段齐全）
-# 憫忠寺只有 1 首诗且无清人核访，所以改用盧溝橋（卷三，16 首，有核访）
+# 目标地点要「四段齐全」：憫忠寺只有 1 首诗且无清人核访，改用盧溝橋（卷三/16 首/有核访）
 TARGET = "盧溝橋"
 
 
@@ -66,7 +79,7 @@ def find_chromium() -> str | None:
 
 
 class Rec:
-    """带时间轴的记录器：所有动作按绝对时间点执行，保证与字幕对齐。"""
+    """按绝对时间点执行动作，保证与字幕对齐。"""
 
     def __init__(self, page, t0: float, offset: float):
         self.page = page
@@ -139,7 +152,7 @@ class Rec:
             self.note(f"! 点击第 {idx} 个 {container} 失败: {exc}")
             return False
 
-    def scroll(self, selector: str, top: float, block: str = "start") -> None:
+    def scroll(self, selector: str, top: float) -> None:
         self.js(f"() => {{ const e = document.querySelector('{selector}');"
                 f" if (e) e.scrollTo({{ top: {top}, behavior: 'smooth' }}); }}")
 
@@ -147,7 +160,7 @@ class Rec:
         return self.js("() => document.querySelectorAll('#placeList li').length")
 
     def section_offsets(self, sel: str = "#detail") -> dict:
-        """各 .d-sec 段落相对于滚动容器的绝对偏移（用真实几何算，不猜数字）。"""
+        """各 .d-sec 段落相对于滚动容器的绝对偏移（读真实几何，不猜数字）。"""
         return self.js(f"""() => {{
           const d = document.querySelector('{sel}');
           if (!d) return {{}};
@@ -155,24 +168,23 @@ class Rec:
           const out = {{}};
           d.querySelectorAll('.d-sec').forEach(s => {{
             const h = s.querySelector('h3');
-            const key = (h ? h.textContent : '').trim().slice(0, 4);
-            out[key] = Math.round(s.getBoundingClientRect().top - dt + d.scrollTop);
+            out[(h ? h.textContent : '').trim().slice(0, 4)] =
+              Math.round(s.getBoundingClientRect().top - dt + d.scrollTop);
           }});
-          out._max = d.scrollHeight;
           return out;
         }}""") or {}
 
     def scroll_to_section(self, key: str, sel: str = "#detail") -> bool:
         offs = self.section_offsets(sel)
-        self.note(f"detail 段落偏移 = {offs}")
-        hit = [v for k, v in offs.items() if not k.startswith("_") and key[:2] in k]
+        self.note(f"段落偏移 = {offs}")
+        hit = [v for k, v in offs.items() if key[:2] in k]
         if not hit:
             return False
         self.scroll(sel, max(0, hit[0] - 14))
         return True
 
     def select_place(self, name: str) -> bool:
-        """点开一个地点，并**校验**详情面板真的渲染了（否则重试、再不行用 JS 兑底）。"""
+        """点开地点并**校验**详情真的渲染了；失败重试，再不行用 JS 兜底。"""
         for attempt in (1, 2):
             self.click_text("#placeList", name)
             self.page.wait_for_timeout(700)
@@ -181,7 +193,6 @@ class Rec:
             self.note(f"尝试 {attempt}: detail 标题 = {title!r}")
             if title and name[:2] in title:
                 return True
-        # JS 兑底：直接触发 li 的 onclick（app.js 里 li.onclick = select(id,true)）
         ok = self.js(
             "() => {\n"
             "  const li = [...document.querySelectorAll('#placeList li')]\n"
@@ -191,11 +202,95 @@ class Rec:
             "}"
         )
         self.page.wait_for_timeout(700)
-        self.note(f"JS 兑底 onclick = {ok}")
+        self.note(f"JS 兜底 onclick = {ok}")
         return bool(ok)
 
 
-def write_srt(subs: list[tuple[float, str]], out: Path) -> None:
+class Screencast:
+    """CDP 逐帧抓图（JPEG），质量远高于 Playwright 内置录像。"""
+
+    def __init__(self, page, frames_dir: Path, quality: int = 95):
+        self.page = page
+        self.dir = frames_dir
+        self.dir.mkdir(parents=True, exist_ok=True)
+        self.quality = quality
+        self.stamps: list[float] = []
+        self.count = 0
+        self.bytes = 0
+        self.t_first = time.monotonic()
+        self.session = page.context.new_cdp_session(page)
+        self.session.on("Page.screencastFrame", self._on_frame)
+
+    def _on_frame(self, params) -> None:
+        try:
+            blob = base64.b64decode(params["data"])
+            (self.dir / f"f{self.count:06d}.jpg").write_bytes(blob)
+            self.count += 1
+            self.bytes += len(blob)
+            self.stamps.append(time.monotonic() - self.t_first)
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            try:
+                self.session.send("Page.screencastFrameAck",
+                                  {"sessionId": params["sessionId"]})
+            except Exception:  # noqa: BLE001
+                pass
+
+    def start(self) -> None:
+        self.t_first = time.monotonic()
+        self.session.send("Page.startScreencast", {
+            "format": "jpeg", "quality": self.quality,
+            "maxWidth": W, "maxHeight": H, "everyNthFrame": 1,
+        })
+
+    def stop(self) -> None:
+        try:
+            self.session.send("Page.stopScreencast")
+        except Exception:  # noqa: BLE001
+            pass
+        (self.dir / "stamps.json").write_text(
+            json.dumps({"stamps": self.stamps}), encoding="utf-8")
+        span = (self.stamps[-1] - self.stamps[0]) if len(self.stamps) > 1 else 0.0
+        fps = (len(self.stamps) - 1) / span if span > 0 else 0.0
+        avg = self.bytes / self.count / 1024 if self.count else 0
+        print(f"采集：{self.count} 帧 / {span:.1f}s  ≈ {fps:.1f} fps，"
+              f"平均 {avg:.0f} KB/帧（合计 {self.bytes / 1024 / 1024:.0f} MB）", flush=True)
+
+
+def ffmpeg() -> str:
+    exe = shutil.which("ffmpeg")
+    if not exe:
+        raise SystemExit("找不到 ffmpeg")
+    return exe
+
+
+def filter_path(p: Path) -> str:
+    """滤镜参数里的路径不能带盘符冒号（会被当成选项分隔符），尽量转成相对路径。"""
+    try:
+        return p.resolve().relative_to(Path.cwd().resolve()).as_posix()
+    except Exception:  # noqa: BLE001
+        return p.resolve().as_posix().replace(":", "\\:")
+
+
+def run(cmd, quiet: bool = False) -> None:
+    r = subprocess.run(cmd, capture_output=True, text=True, errors="replace")
+    if r.returncode != 0:
+        tail = (r.stderr or "").strip().splitlines()[-25:]
+        raise SystemExit("ffmpeg 失败：\n" + "\n".join(tail))
+    if not quiet:
+        print(" ".join(str(c) for c in cmd[:3]) + " ... ok", flush=True)
+
+
+def sub_times() -> list[tuple[float, float, str]]:
+    out = []
+    for i, (t, text) in enumerate(SUBS):
+        end = SUBS[i + 1][0] - 0.3 if i + 1 < len(SUBS) else END_AT
+        out.append((t, max(end, t + 1.0), text))
+    return out
+
+
+def write_srt(out: Path) -> None:
     def ts(t: float) -> str:
         ms = int(round(t * 1000))
         h, ms = divmod(ms, 3600000)
@@ -203,15 +298,63 @@ def write_srt(subs: list[tuple[float, str]], out: Path) -> None:
         s, ms = divmod(ms, 1000)
         return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
-    lines = []
-    for i, (t, text) in enumerate(subs):
-        end = subs[i + 1][0] - 0.3 if i + 1 < len(subs) else END_AT
-        lines.append(f"{i + 1}\n{ts(t)} --> {ts(max(end, t + 1.0))}\n{text}\n")
+    lines = [f"{i + 1}\n{ts(a)} --> {ts(b)}\n{t}\n"
+             for i, (a, b, t) in enumerate(sub_times())]
     out.write_text("\n".join(lines), encoding="utf-8")
 
 
+def encode_from_screencast(sc: Screencast, out_path: Path, *, trim: float,
+                           ass: Path, music: Path, crf: int, gain: float) -> None:
+    """按真实时间戳把 JPEG 帧编成成片，并烧字幕 + 混音。"""
+    sel = [(i, t - trim) for i, t in enumerate(sc.stamps)
+           if trim - 1e-3 <= t <= END_AT + 0.35]
+    if len(sel) < 10:
+        raise SystemExit(f"可用帧太少（{len(sel)}）")
+    lines = []
+    for k, (idx, rel) in enumerate(sel):
+        nxt = sel[k + 1][1] if k + 1 < len(sel) else rel + 1.0 / FPS
+        d = min(0.5, max(1.0 / (FPS * 2), nxt - rel))
+        lines.append(f"file 'f{idx:06d}.jpg'")
+        lines.append(f"duration {d:.4f}")
+    lines.append(f"file 'f{sel[-1][0]:06d}.jpg'")
+    listfile = sc.dir / "frames.txt"
+    listfile.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"编码：{len(sel)} 帧，CRF {crf}，码率上限由 CRF 决定", flush=True)
+
+    fade_out = max(0.0, END_AT - 4.0)
+    run([ffmpeg(), "-y", "-loglevel", "error",
+         "-f", "concat", "-safe", "0", "-i", str(listfile),
+         "-i", str(music),
+         "-filter_complex",
+         f"[0:v]ass={filter_path(ass)}[v];"
+         f"[1:a]volume={gain},afade=t=in:st=0:d=1.2,"
+         f"afade=t=out:st={fade_out:.1f}:d=4[a]",
+         "-map", "[v]", "-map", "[a]",
+         "-c:v", "libx264", "-crf", str(crf), "-preset", "slow",
+         "-x264-params", "keyint=50:min-keyint=25",
+         "-fps_mode", "cfr", "-r", str(FPS), "-pix_fmt", "yuv420p",
+         "-c:a", "aac", "-b:a", "192k", "-t", f"{END_AT:.3f}",
+         "-movflags", "+faststart", str(out_path)])
+
+
+def encode_from_webm(raw: Path, out_path: Path, *, trim: float, ass: Path,
+                     music: Path, crf: int, gain: float) -> None:
+    fade_out = max(0.0, END_AT - 4.0)
+    run([ffmpeg(), "-y", "-loglevel", "error", "-ss", f"{trim:.3f}", "-i", str(raw),
+         "-i", str(music),
+         "-filter_complex",
+         f"[0:v]ass={filter_path(ass)}[v];"
+         f"[1:a]volume={gain},afade=t=in:st=0:d=1.2,"
+         f"afade=t=out:st={fade_out:.1f}:d=4[a]",
+         "-map", "[v]", "-map", "[a]",
+         "-c:v", "libx264", "-crf", str(crf), "-preset", "slow",
+         "-fps_mode", "cfr", "-r", str(FPS), "-pix_fmt", "yuv420p",
+         "-c:a", "aac", "-b:a", "192k", "-t", f"{END_AT:.3f}",
+         "-movflags", "+faststart", str(out_path)])
+
+
 def probe(base: str) -> int:
-    """不录像，只跑一遍关键交互与几何量，用于录制前的快速自检。"""
+    """不录像，只跑一遍关键交互与几何量，用于录制前快速自检。"""
     from playwright.sync_api import sync_playwright
 
     exe = find_chromium()
@@ -227,7 +370,8 @@ def probe(base: str) -> int:
         page = ctx.new_page()
         page.goto(base, wait_until="domcontentloaded", timeout=60000)
         page.wait_for_function(
-            "() => window.DJJWL && ['ready','failed'].includes(DJJWL.mapState)", timeout=120000)
+            "() => window.DJJWL && ['ready','failed'].includes(DJJWL.mapState)",
+            timeout=120000)
         r = Rec(page, time.monotonic(), 0.0)
 
         def count():
@@ -244,13 +388,8 @@ def probe(base: str) -> int:
         r.click_text("#tagFilter", "寺院")
         page.wait_for_timeout(700)
         print(f"地点数 重置后 = {count()}", flush=True)
-
         print(f"select_place('{TARGET}') = {r.select_place(TARGET)}", flush=True)
         print(f"段落偏移 = {r.section_offsets()}", flush=True)
-        r.js("() => { document.querySelectorAll('#detail details.poem')"
-             ".forEach((d, i) => { if (i < 2) d.open = true; }); }")
-        page.wait_for_timeout(500)
-        print(f"展开诗后偏移 = {r.section_offsets()}", flush=True)
         ctx.close()
         browser.close()
     return 0
@@ -260,22 +399,27 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://localhost:8080/")
     ap.add_argument("--outdir", default="video")
+    ap.add_argument("--capture", choices=["cdp", "video"], default="cdp")
+    ap.add_argument("--quality", type=int, default=90, help="JPEG 质量（CDP 采集）")
+    ap.add_argument("--crf", type=int, default=15, help="成片 CRF，越小越清晰越大")
+    ap.add_argument("--gain", type=float, default=0.78, help="配乐音量")
+    ap.add_argument("--font-size", type=int, default=46)
+    ap.add_argument("--no-encode", action="store_true", help="只录不编码")
+    ap.add_argument("--keep-frames", dest="keep_frames", action="store_true",
+                    help="采集帧留在 video/_frames（约 300 MB），便于换 CRF 重编码")
+    ap.add_argument("--encode-only", dest="encode_only", action="store_true",
+                    help="复用 video/_frames 重新编码，不重录")
     ap.add_argument("--list-only", action="store_true")
     ap.add_argument("--probe", action="store_true", help="只自检交互，不录像")
     ap.add_argument("--srt-only", dest="srt_only", action="store_true",
-                    help="只从当前时间轴导出字幕，不录像")
+                    help="只导出字幕文件，不录像")
     args = ap.parse_args()
 
     if args.probe:
         return probe(args.base)
 
-    if args.srt_only:
-        outdir = Path(args.outdir)
-        outdir.mkdir(parents=True, exist_ok=True)
-        p = outdir / "正片字幕.srt"
-        write_srt(SUBS, p)
-        print(f"{p}  {len(SUBS)} 条  （中间产物，成片里的字幕已烧入）", flush=True)
-        return 0
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
 
     if args.list_only:
         for t, s in SUBS:
@@ -283,15 +427,38 @@ def main() -> int:
         print(f"落版 {END_AT:.0f}s")
         return 0
 
+    if args.srt_only:
+        p = outdir / "正片字幕.srt"
+        write_srt(p)
+        print(f"{p}  {len(SUBS)} 条（中间产物，成片里的字幕已烧入）", flush=True)
+        return 0
+
     from playwright.sync_api import sync_playwright
 
-    outdir = Path(args.outdir)
-    outdir.mkdir(parents=True, exist_ok=True)
+    out_mp4 = outdir / "正片-帝京寻踪.mp4"
+    music = outdir / "music.wav"
+    ass = outdir / "subs.ass"
+
+    if args.encode_only:
+        fdir = outdir / "_frames"
+        meta = json.loads((fdir / "stamps.json").read_text(encoding="utf-8"))
+        tl = outdir / "_timeline.json"
+        trim = (json.loads(tl.read_text(encoding="utf-8"))["trim_start"]
+                if tl.exists() else float(meta.get("trim", 0.0)))
+        make_subs.write_ass(sub_times(), ass, width=W, height=H, size=args.font_size)
+        encode_from_screencast(SimpleNamespace(dir=fdir, stamps=meta["stamps"]),
+                               out_mp4, trim=trim, ass=ass, music=music,
+                               crf=args.crf, gain=args.gain)
+        print(f"{out_mp4}  {out_mp4.stat().st_size / 1024 / 1024:.1f} MB  (CRF {args.crf})",
+              flush=True)
+        return 0
+
     exe = find_chromium()
-    print(f"chromium: {exe or '(默认)'}", flush=True)
+    print(f"chromium: {exe or '(默认)'}   采集方式: {args.capture}", flush=True)
 
     with tempfile.TemporaryDirectory() as td:
-        recdir = Path(td) / "rec"
+        tmp = Path(td)
+        recdir = tmp / "rec"
         recdir.mkdir()
         with sync_playwright() as pw:
             kw = {"headless": False}
@@ -301,11 +468,12 @@ def main() -> int:
                           "--hide-scrollbars",
                           "--disable-features=CalculateNativeWinOcclusion"]
             browser = pw.chromium.launch(**kw)
-            ctx = browser.new_context(
-                viewport={"width": W, "height": H}, device_scale_factor=1, locale="zh-CN",
-                record_video_dir=str(recdir),
-                record_video_size={"width": W, "height": H},
-            )
+            ctx_kw = dict(viewport={"width": W, "height": H}, device_scale_factor=1,
+                          locale="zh-CN")
+            if args.capture == "video":
+                ctx_kw["record_video_dir"] = str(recdir)
+                ctx_kw["record_video_size"] = {"width": W, "height": H}
+            ctx = browser.new_context(**ctx_kw)
             t_created = time.monotonic()
             page = ctx.new_page()
             page.goto(args.base, wait_until="domcontentloaded", timeout=60000)
@@ -319,7 +487,12 @@ def main() -> int:
             print(f"地图就绪 {offset:.1f}s（成片剪掉）", flush=True)
             page.wait_for_timeout(1200)
 
-            # 落版层（最后才显示）
+            sc = None
+            if args.capture == "cdp":
+                sc = Screencast(page, (outdir / "_frames") if args.keep_frames
+                                else (tmp / "frames"), quality=args.quality)
+                sc.start()
+
             page.evaluate("""() => {
               const d = document.createElement('div');
               d.id = '__endcard';
@@ -340,13 +513,13 @@ def main() -> int:
                 r.until(r.now + 0.75)
             r.note("pan 全景")
 
-            # 5-9s 拉远看全城 30 个标记
+            # 5-9s 拉远看全城
             for z in (12.4, 11.9, 11.5, 11.2, 11.0):
                 r.js(f"() => {{ const m = DJJWL.getMap(); if (m) m.setZoom({z}); }}")
                 r.until(r.now + 0.75)
             r.note("zoom out 全城")
 
-            # 9-16s 移到城南 + 筛选（用真实 chip 文案；点完再取消，保证目标地点在清单里）
+            # 9-16s 移到城南 + 筛选（真实 chip 文案；点完再取消）
             r.js("() => { const m = DJJWL.getMap();"
                  " if (m) m.centerAndZoom(new BMapGL.Point(116.401, 39.888), 14.5); }")
             r.until(10.3)
@@ -364,7 +537,7 @@ def main() -> int:
             r.until(15.6)
             r.note(f"重置后 = {r.list_count()}")
 
-            # 16-18.6s 点开目标地点（带校验 + JS 兑底）
+            # 16-18.6s 点开目标地点
             r.until(16.0)
             if not r.select_place(TARGET):
                 r.note(f"!! {TARGET} 未能选中")
@@ -372,7 +545,7 @@ def main() -> int:
             r.js("() => { const m = DJJWL.getMap(); if (m) m.setZoom(15.0); }")
             r.note(f"打开 {TARGET}")
 
-            # 18.6-32s 详情逐段：白话今译 → 原书记载 → 关联诗篇（展开）→ 清人核访
+            # 18.6-32s 详情逐段
             r.until(18.8)
             r.scroll_to_section("白话")
             r.until(22.6)
@@ -404,7 +577,6 @@ def main() -> int:
             r.js("() => { const e = document.querySelector('#p3Out');"
                  " if (e) e.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }")
             r.until(41.4)
-            r.note("展示方案")
 
             # 42-49s 应用方案 + 混合模式 + 生成真实路线
             r.until(42.4)
@@ -449,26 +621,40 @@ def main() -> int:
             # 58-60s 落版
             r.js("() => { const d = document.querySelector('#__endcard');"
                  " if (d) d.style.display = 'flex'; }")
-            r.until(END_AT + VIDEO_EXTRA_TAIL)
+            r.until(END_AT + EXTRA_TAIL)
             r.note("endcard")
 
+            if sc:
+                sc.stop()
             ctx.close()
             browser.close()
 
-        webms = sorted(recdir.glob("*.webm"))
-        if not webms:
-            raise SystemExit("没有拿到录像文件")
-        raw = outdir / "_raw.webm"
-        shutil.move(str(webms[0]), str(raw))
-        print(f"raw: {raw}  {raw.stat().st_size / 1024 / 1024:.1f} MB", flush=True)
+        # 字幕：直接从代码里的时间轴写 ASS（不经外挂 SRT）
+        # 写到相对路径，避开滤镜参数里盘符冒号的问题
+        make_subs.write_ass(sub_times(), ass, width=W, height=H, size=args.font_size)
 
-    srt = outdir / "正片字幕.srt"
-    write_srt(SUBS, srt)
+        if args.no_encode:
+            print("--no-encode：跳过编码", flush=True)
+            return 0
+
+        if args.capture == "cdp":
+            encode_from_screencast(sc, out_mp4, trim=offset, ass=ass,
+                                   music=music, crf=args.crf, gain=args.gain)
+        else:
+            webms = sorted(recdir.glob("*.webm"))
+            if not webms:
+                raise SystemExit("没有拿到录像文件")
+            raw = outdir / "_raw.webm"
+            shutil.move(str(webms[0]), str(raw))
+            encode_from_webm(raw, out_mp4, trim=offset, ass=ass,
+                             music=music, crf=args.crf, gain=args.gain)
+
     (outdir / "_timeline.json").write_text(json.dumps(
-        {"trim_start": round(offset, 3), "end_at": END_AT,
-         "subs": [{"t": t, "text": s} for t, s in SUBS]}, ensure_ascii=False, indent=2),
-        encoding="utf-8")
-    print(f"srt: {srt}  ({len(SUBS)} 条)", flush=True)
+        {"trim_start": round(offset, 3), "end_at": END_AT, "capture": args.capture,
+         "crf": args.crf, "subs": [{"t": t, "text": s} for t, s in SUBS]},
+        ensure_ascii=False, indent=2), encoding="utf-8")
+    size = out_mp4.stat().st_size / 1024 / 1024
+    print(f"{out_mp4}  {size:.1f} MB", flush=True)
     return 0
 
 
