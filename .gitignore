@@ -21,6 +21,9 @@ desktop.ini
 
 # ---- 可由 tools/ 重新生成的大图（seed 固定，见 docs/AI素材说明.md）----
 banner/ai-bg-*.png
-banner/intro-scene-*.png
-banner/intro-title.png
-banner/intro-claim.png
+banner/film-*.png
+banner/demo/
+banner/_*.png
+
+# 「开场」是 片头+氛围 的拼接产物，可随时用 --concat-only 重建，不入仓库
+video/开场-*.mp4

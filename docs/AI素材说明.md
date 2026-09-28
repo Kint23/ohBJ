@@ -63,14 +63,21 @@ uv run tools/make_banner.py --bg banner/ai-bg-b.png --bg-mix 0.55 `
 - 不加 `--bg` 就是纯纸色底版（`帝京寻踪-banner-纸质底版.png`）
 - **文字全部由 Pillow 用楷体绘制**，所以标题、数字、坐标一定是准确的，不受 AI 出字影响
 
-### `tools/make_intro.py` — 生成 AI 片头（4 幕 + 交叉淡化 + 标题）
+### `tools/make_film.py` — 生成 AI 影像（片头 / 氛围 / 演示）
 ```powershell
-uv run tools/make_intro.py            # 生成缺失静帧并合成
-uv run tools/make_intro.py --no-gen   # 只重新合成
-uv run tools/make_intro.py --force    # 重出静帧（换 seed 就在 SCENES 里改）
+uv run tools/make_film.py --program intro        # 片头 4 幕（13.6s）
+uv run tools/make_film.py --program atmosphere   # 氛围 10 幕（41.5s）
+uv run tools/make_film.py --program demo         # Playwright 截图 → 演示片（34.9s）
+uv run tools/make_film.py --program all --concat # 再拼成「开场」（55.1s）
+uv run tools/make_film.py --force                # 重出静帧（换 seed 就改 SCENES / ATMO）
 ```
-影片结构：每幕 4.0s 缓慢推近（zoompan），幕间 0.8s 交叉淡化，
-标题卡 0.6s 淡入 / 4.7s 淡出，主张句在结尾 4.4s 淡入。总长 **13.6s**，1920×1080 / 25fps / H.264。
+影片结构：每幕缓慢推近或拉远（缩放约 8%–17%），幕间 0.8–1.0s 交叉淡化，
+标题卡 0.6s 淡入 / 4.7s 淡出，主张句在结尾 4.4s 淡入。
+
+**运镜已修掉「震动感」**：原先用 ffmpeg `zoompan`，它的 x/y 只能取整数，
+1080p 下每帧位移不足 1 像素时会在两个整数间反复跳 → 观感就是哆嗦。
+现改为母版 2400×1350 + Pillow `Image.AFFINE` 浮点平移取样（BICUBIC）+ LANCZOS 降采样，
+并对缩放/位移套 smoothstep 缓动，位移是连续量。
 
 ## 四、产物清单
 
@@ -80,9 +87,12 @@ uv run tools/make_intro.py --force    # 重出静帧（换 seed 就在 SCENES �
 | `banner/帝京寻踪-banner-纸质底版.png` / `.jpg` | 纯纸色底版（不依赖 AI 的保底方案） |
 | `banner/候选A.png` / `候选B.png` / `候选C.png` | 三张 AI 背景的成品对比 |
 | `banner/ai-bg-a.png` / `ai-bg-b.png` / `ai-bg-c.png` | AI 背景原图（1664×928） |
-| `banner/intro-scene-1..4.png` | 片头 4 幕静帧（1920×1088） |
-| `banner/intro-title.png` / `intro-claim.png` | 片头标题层 / 主张层（RGBA，可用 `--no-gen` 快速重排） |
-| `video/片头-帝京寻踪.mp4` | **AI 片头正片**（13.6s / 1080p / 13.8 MB） |
+| `banner/film-*.png` | 片头 4 幕 + 氛围 10 幕静帧（2400×1344，原生超采样） |
+| `banner/demo/01..07-*.png` | Playwright 截的真实页面状态图（1920×1080） |
+| `video/片头-帝京寻踪.mp4` | **AI 片头**（13.6s / 1080p） |
+| `video/氛围-帝京寻踪.mp4` | **氛围铺垫 10 幕**（41.5s，每幕带「明清名 → 今名」字幕） |
+| `video/开场-帝京寻踪.mp4` | 片头 + 氛围拼接（55.1s） |
+| `video/演示-帝京寻踪.mp4` | **真实页面截图合成演示片**（34.9s，7 个操作状态） |
 
 `video/` **不会**被 GitHub Pages 发布（workflow 只发布 `app/`、`data/places.json`、`data/routes.json`、`docs/`）。
 
