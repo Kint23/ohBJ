@@ -40,6 +40,8 @@ jobs:
           find _site -type f | sort
 
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true        # 若仓库尚未启用 Pages，自动启用（省去手动去 Settings 点）
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
