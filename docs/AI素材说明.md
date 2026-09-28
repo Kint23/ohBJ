@@ -18,10 +18,10 @@ AI 生成视频无法呈现「点一下真的出路线」这件事。
 
 - **ComfyUI Desktop v1.0.46**，HTTP API 在 **`http://127.0.0.1:8188`**
   - 注意：端口是**动态**的，每次启动可能变，真实端口看日志
-    `C:\Users\user\AppData\Local\Comfy-Desktop\ComfyUI-Installs\ComfyUI\logs\comfyui*.log`
+    `%LOCALAPPDATA%\Comfy-Desktop\ComfyUI-Installs\ComfyUI\logs\comfyui*.log`
     里的 `To see the GUI go to: http://127.0.0.1:xxxxx`
-  - 安装位置：`C:\Users\user\AppData\Local\Comfy-Desktop\ComfyUI-Installs\ComfyUI`
-  - 输出目录：`C:\Users\user\AppData\Local\Comfy-Desktop\ComfyUI-Shared\output`
+  - 安装位置：`%LOCALAPPDATA%\Comfy-Desktop\ComfyUI-Installs\ComfyUI`
+  - 输出目录：`%LOCALAPPDATA%\Comfy-Desktop\ComfyUI-Shared\output`
   - 另有一个旧版 `D:\ComfyUI\ComfyUI.exe`（v0.8.30），**不是**当前在用的，别启动它
 - **出图模型**（实例可见的三件套 + 加速 LoRA）
   - UNET `qwen_image_2512_fp8_e4m3fn.safetensors`
@@ -29,7 +29,7 @@ AI 生成视频无法呈现「点一下真的出路线」这件事。
   - VAE `qwen_image_vae.safetensors`
   - LoRA `Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors`
 - **速度**：RTX 4090，4 步 / cfg 1.0 / euler+simple，1664×928 约 **8 秒**，1920×1088 约 **10 秒**（模型加载后）
-- **ffmpeg**：`C:\Users\user\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_...\bin\ffmpeg.exe`（9.0.1）
+- **ffmpeg**：`%LOCALAPPDATA%\Microsoft\WinGet\Packages\Gyan.FFmpeg_...\bin\ffmpeg.exe`（9.0.1）
 
 ## 三、脚本
 

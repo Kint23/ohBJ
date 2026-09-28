@@ -28,6 +28,14 @@ banner/_*.png
 # 「开场」是 片头+氛围 的拼接产物，可随时用 --concat-only 重建，不入仓库
 video/开场-*.mp4
 
+# 只上传成片；其余 AI 影像留在本机（可用 tools/make_film.py 重建）
+video/片头-*.mp4
+video/氛围-*.mp4
+video/演示-*.mp4
+
+# 本机备份配方：含本机用户名/路径与私人邮箱，绝不上传
+BACKUP.md
+
 # 正片的中间产物（可由 tools/ 重建）
 video/_raw.webm
 video/_frames/
