@@ -35,6 +35,11 @@ jobs:
           cp data/places.json data/routes.json _site/data/
           cp README.md _site/README.md
           if [ -d docs ]; then cp -r docs _site/docs; fi
+          # 演示视频：发布到站点并改成 ASCII 文件名，方便在 README 里引用/内嵌
+          mkdir -p _site/video
+          if ls video/正片-*.mp4 >/dev/null 2>&1; then
+            cp video/正片-*.mp4 _site/video/demo.mp4
+          fi
           touch _site/.nojekyll
           echo "--- staged ---"
           find _site -type f | sort

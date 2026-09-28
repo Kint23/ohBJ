@@ -7,6 +7,18 @@
 
 ---
 
+## 作品演示（60 秒）
+
+[![点击播放：帝京寻踪 · 60 秒演示](banner/帝京寻踪-banner-1200x675.png)](https://kint23.github.io/ohBJ/video/demo.mp4)
+
+▶ **在线播放 / 下载**：<https://kint23.github.io/ohBJ/video/demo.mp4>（MP4，约 53 MB）
+🖥 **在线 Demo**：<https://kint23.github.io/ohBJ/>
+
+> 视频内容：5 秒《京師五城圖》古地图开场 → 实机操作（三重筛选 → 点开盧溝橋 →
+> 白话今译 / 原书记载 / 关联诗篇 / 清人实地核访 → 智能排线 3 方案 → 百度路线规划真实里程）→ 落版。
+
+---
+
 ## 一、快速开始
 
 ### 1. 本地预览（必须用本地服务器，不能双击 html）
