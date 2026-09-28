@@ -33,17 +33,22 @@ END_AT = 60.0
 SUBS = [
     (0.0, "明代人写下的北京，今天还在吗？"),
     (5.0, "127 处风物，落点 30 处古迹"),
-    (10.0, "按卷次、类型、步行圈逐层收窄"),
-    (15.0, "点开一处：明清地名 → 今日地名"),
-    (19.0, "原书记载，逐字可对"),
-    (24.0, "关联诗篇 · 白话今译"),
-    (28.0, "清人《京城古迹考》的实地核访"),
-    (32.0, "只说一句：半天想逛寺庙"),
-    (39.0, "智能排线给出 3 个取舍不同的方案"),
-    (43.0, "一键调用百度路线规划"),
-    (50.0, "真实里程与耗时：短腿走路，远腿坐车"),
-    (55.5, "也可以直接问「明代北京城 AI 导游」"),
+    (10.0, "按卷次、类型逐层收窄"),
+    (16.0, "点开一处：明清地名 → 今日地名"),
+    (18.6, "白话今译 · AI 辅助译文"),
+    (22.6, "原书记载 · 《帝京景物略》"),
+    (26.0, "关联诗篇，附作者与朝代"),
+    (29.6, "清人《京城古迹考》的实地核访"),
+    (33.0, "只说一句：半天想逛寺庙"),
+    (38.5, "智能排线给出 3 个取舍不同的方案"),
+    (42.5, "一键调用百度路线规划"),
+    (51.5, "真实里程与耗时：短腿走路，远腿坐车"),
+    (55.0, "也可以直接问「明代北京城 AI 导游」"),
 ]
+
+# 目标地点：要有白话今译 + 原书记载 + 很多关联诗篇 + 清人实地核访（四段齐全）
+# 憫忠寺只有 1 首诗且无清人核访，所以改用盧溝橋（卷三，16 首，有核访）
+TARGET = "盧溝橋"
 
 
 def find_chromium() -> str | None:
@@ -116,6 +121,7 @@ class Rec:
                     self._hover(el.bounding_box())
                     el.click(timeout=5000)
                     return True
+            self.note(f"! {container} 里找不到「{text}」")
             return False
         except Exception as exc:  # noqa: BLE001
             self.note(f"! 点击文本 {container}/{text} 失败: {exc}")
@@ -135,6 +141,57 @@ class Rec:
         self.js(f"() => {{ const e = document.querySelector('{selector}');"
                 f" if (e) e.scrollTo({{ top: {top}, behavior: 'smooth' }}); }}")
 
+    def list_count(self):
+        return self.js("() => document.querySelectorAll('#placeList li').length")
+
+    def section_offsets(self, sel: str = "#detail") -> dict:
+        """各 .d-sec 段落相对于滚动容器的绝对偏移（用真实几何算，不猜数字）。"""
+        return self.js(f"""() => {{
+          const d = document.querySelector('{sel}');
+          if (!d) return {{}};
+          const dt = d.getBoundingClientRect().top;
+          const out = {{}};
+          d.querySelectorAll('.d-sec').forEach(s => {{
+            const h = s.querySelector('h3');
+            const key = (h ? h.textContent : '').trim().slice(0, 4);
+            out[key] = Math.round(s.getBoundingClientRect().top - dt + d.scrollTop);
+          }});
+          out._max = d.scrollHeight;
+          return out;
+        }}""") or {}
+
+    def scroll_to_section(self, key: str, sel: str = "#detail") -> bool:
+        offs = self.section_offsets(sel)
+        self.note(f"detail 段落偏移 = {offs}")
+        hit = [v for k, v in offs.items() if not k.startswith("_") and key[:2] in k]
+        if not hit:
+            return False
+        self.scroll(sel, max(0, hit[0] - 14))
+        return True
+
+    def select_place(self, name: str) -> bool:
+        """点开一个地点，并**校验**详情面板真的渲染了（否则重试、再不行用 JS 兑底）。"""
+        for attempt in (1, 2):
+            self.click_text("#placeList", name)
+            self.page.wait_for_timeout(700)
+            title = self.js("() => { const t = document.querySelector('#detail .d-title');"
+                            " return t ? t.textContent.trim() : null; }")
+            self.note(f"尝试 {attempt}: detail 标题 = {title!r}")
+            if title and name[:2] in title:
+                return True
+        # JS 兑底：直接触发 li 的 onclick（app.js 里 li.onclick = select(id,true)）
+        ok = self.js(
+            "() => {\n"
+            "  const li = [...document.querySelectorAll('#placeList li')]\n"
+            "    .find(x => x.textContent.includes('" + name + "'));\n"
+            "  if (!li) return false;\n"
+            "  li.onclick(); return true;\n"
+            "}"
+        )
+        self.page.wait_for_timeout(700)
+        self.note(f"JS 兑底 onclick = {ok}")
+        return bool(ok)
+
 
 def write_srt(subs: list[tuple[float, str]], out: Path) -> None:
     def ts(t: float) -> str:
@@ -151,12 +208,62 @@ def write_srt(subs: list[tuple[float, str]], out: Path) -> None:
     out.write_text("\n".join(lines), encoding="utf-8")
 
 
+def probe(base: str) -> int:
+    """不录像，只跑一遍关键交互与几何量，用于录制前的快速自检。"""
+    from playwright.sync_api import sync_playwright
+
+    exe = find_chromium()
+    with sync_playwright() as pw:
+        kw = {"headless": False}
+        if exe:
+            kw["executable_path"] = exe
+        kw["args"] = [f"--window-size={W},{H}", "--force-device-scale-factor=1",
+                      "--hide-scrollbars"]
+        browser = pw.chromium.launch(**kw)
+        ctx = browser.new_context(viewport={"width": W, "height": H},
+                                  device_scale_factor=1, locale="zh-CN")
+        page = ctx.new_page()
+        page.goto(base, wait_until="domcontentloaded", timeout=60000)
+        page.wait_for_function(
+            "() => window.DJJWL && ['ready','failed'].includes(DJJWL.mapState)", timeout=120000)
+        r = Rec(page, time.monotonic(), 0.0)
+
+        def count():
+            return r.js("() => document.querySelectorAll('#placeList li').length")
+
+        print(f"地点数 初始 = {count()}", flush=True)
+        r.click_text("#volumeFilter", "三·城南內外")
+        page.wait_for_timeout(700)
+        r.click_text("#tagFilter", "寺院")
+        page.wait_for_timeout(700)
+        print(f"地点数 筛选后 = {count()}", flush=True)
+        r.click_text("#volumeFilter", "三·城南內外")
+        page.wait_for_timeout(700)
+        r.click_text("#tagFilter", "寺院")
+        page.wait_for_timeout(700)
+        print(f"地点数 重置后 = {count()}", flush=True)
+
+        print(f"select_place('{TARGET}') = {r.select_place(TARGET)}", flush=True)
+        print(f"段落偏移 = {r.section_offsets()}", flush=True)
+        r.js("() => { document.querySelectorAll('#detail details.poem')"
+             ".forEach((d, i) => { if (i < 2) d.open = true; }); }")
+        page.wait_for_timeout(500)
+        print(f"展开诗后偏移 = {r.section_offsets()}", flush=True)
+        ctx.close()
+        browser.close()
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="http://localhost:8080/")
     ap.add_argument("--outdir", default="video")
     ap.add_argument("--list-only", action="store_true")
+    ap.add_argument("--probe", action="store_true", help="只自检交互，不录像")
     args = ap.parse_args()
+
+    if args.probe:
+        return probe(args.base)
 
     if args.list_only:
         for t, s in SUBS:
@@ -227,42 +334,56 @@ def main() -> int:
                 r.until(r.now + 0.75)
             r.note("zoom out 全城")
 
-            # 9-15s 移到城南 + 两重筛选
+            # 9-16s 移到城南 + 筛选（用真实 chip 文案；点完再取消，保证目标地点在清单里）
             r.js("() => { const m = DJJWL.getMap();"
                  " if (m) m.centerAndZoom(new BMapGL.Point(116.401, 39.888), 14.5); }")
-            r.until(10.2)
-            r.click_text("#volumeFilter", "卷三")
-            r.until(12.6)
-            r.click_nth("#tagFilter", 0)
-            r.until(14.6)
-            r.note("筛选")
+            r.until(10.3)
+            n0 = r.list_count()
+            r.click_text("#volumeFilter", "三·城南內外")
+            r.until(12.0)
+            n1 = r.list_count()
+            r.click_text("#tagFilter", "寺院")
+            r.until(13.6)
+            n2 = r.list_count()
+            r.note(f"筛选：{n0} -> {n1} -> {n2}")
+            r.click_text("#volumeFilter", "三·城南內外")
+            r.until(14.8)
+            r.click_text("#tagFilter", "寺院")
+            r.until(15.6)
+            r.note(f"重置后 = {r.list_count()}")
 
-            # 15-19s 点开憫忠寺
-            r.until(15.2)
-            r.click_text("#placeList", "憫忠寺")
-            r.until(17.2)
-            r.js("() => { const m = DJJWL.getMap(); if (m) m.setZoom(15.4); }")
-            r.note("打开憫忠寺")
+            # 16-18.6s 点开目标地点（带校验 + JS 兑底）
+            r.until(16.0)
+            if not r.select_place(TARGET):
+                r.note(f"!! {TARGET} 未能选中")
+            r.until(17.8)
+            r.js("() => { const m = DJJWL.getMap(); if (m) m.setZoom(15.0); }")
+            r.note(f"打开 {TARGET}")
 
-            # 19-31s 详情逐段
-            r.until(19.4)
-            r.scroll("#detail", 430)
-            r.until(23.6)
-            r.scroll("#detail", 1150)
-            r.until(27.6)
-            r.scroll("#detail", 2050)
-            r.until(30.8)
+            # 18.6-32s 详情逐段：白话今译 → 原书记载 → 关联诗篇（展开）→ 清人核访
+            r.until(18.8)
+            r.scroll_to_section("白话")
+            r.until(22.6)
+            r.scroll_to_section("原书")
+            r.until(26.0)
+            r.js("() => { document.querySelectorAll('#detail details.poem')"
+                 ".forEach((d, i) => { if (i < 2) d.open = true; }); }")
+            r.until(26.6)
+            r.scroll_to_section("关联")
+            r.until(29.6)
+            r.scroll_to_section("清人")
+            r.until(31.6)
             r.note("阅读详情")
 
-            # 31-38s 智能排线
+            # 32-38s 智能排线
             try:
                 page.select_option("#p3Dur", "180")
                 page.select_option("#p3Mode", "walking")
             except Exception as exc:  # noqa: BLE001
                 r.note(f"! 排线参数失败: {exc}")
-            r.until(32.4)
+            r.until(33.0)
             r.scroll("#p3Panel", 0)
-            r.until(33.2)
+            r.until(33.8)
             r.box_click("#p3Btn")
             r.note("生成 3 方案")
 
