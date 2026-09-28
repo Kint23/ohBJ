@@ -27,3 +27,10 @@ banner/_*.png
 
 # 「开场」是 片头+氛围 的拼接产物，可随时用 --concat-only 重建，不入仓库
 video/开场-*.mp4
+
+# 正片的中间产物（可由 tools/ 重建）
+video/_raw.webm
+video/_timeline.json
+video/music.wav
+video/subs.ass
+video/subs.srt
