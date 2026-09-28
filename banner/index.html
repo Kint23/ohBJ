@@ -20,13 +20,22 @@
 </head>
 <body>
 <h1>帝京寻踪 · 参赛 Banner 生成器</h1>
-<p>固定 <b>1200 × 675</b>（大赛要求尺寸），点击下载得到 PNG。所有字形都用系统字体在本机渲染，无需联网。</p>
+<p>固定 <b>1200 × 675</b>（大赛要求尺寸），点下载得到 PNG。所有字形用系统字体在本机渲染，无需联网。</p>
+<p><b>想要明人书画风底图？</b>用你本机的 ComfyUI（<code>D:\ComfyUI</code>）先生成一张横幅底图，再在上面的「ComfyUI 背景图」里选进来，
+  并用「纸色叠加」调暗到文字清晰为止。这样<b>风格交给模型、文字交给矢量绘制</b>——任何 AI 图都画不准汉字，但版面必须精准。</p>
 
 <div class="bar">
   <button id="dl" class="primary">下载 PNG（1200×675）</button>
   <label>标题：<input id="t1" value="帝京寻踪" style="font:inherit;font-size:13px;padding:6px 8px;width:140px;border:1px solid var(--line);border-radius:6px" /></label>
   <label>副题：<input id="t2" value="明代北京古今地图" style="font:inherit;font-size:13px;padding:6px 8px;width:180px;border:1px solid var(--line);border-radius:6px" /></label>
+  <label>主张：<input id="t3" value="探索明代北京城，百度细说帝京事" style="font:inherit;font-size:13px;padding:6px 8px;width:290px;border:1px solid var(--line);border-radius:6px" /></label>
   <button id="redraw">重绘</button>
+  <span id="fit" style="font-size:12px;color:#8c8271"></span>
+  <span style="flex-basis:100%;height:0"></span>
+  <label>ComfyUI 背景图：<input id="bgFile" type="file" accept="image/*" style="font-size:12px" /></label>
+  <label>纸色叠加 <input id="ovl" type="range" min="0" max="95" value="62" style="vertical-align:middle;width:130px" /> <b id="ovlV">62</b>%</label>
+  <button id="bgClear">移除背景</button>
+  <label style="margin-left:6px"><input id="wire" type="checkbox" /> 版式参考图（给 Qwen-Image / ControlNet 做底图）</label>
 </div>
 
 <img id="preview" alt="Banner 预览" />
@@ -57,6 +66,12 @@
   // 确定性伪随机，保证每次重绘结果一致
   function rnd(seed) { return function () { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }; }
 
+  function measureSpaced(text, gap) {
+    var w = 0;
+    for (var i = 0; i < text.length; i++) w += g.measureText(text.charAt(i)).width + gap;
+    return Math.max(0, w - (text.length ? gap : 0));
+  }
+
   function spacedText(text, x, y, gap) {
     var cx = x;
     for (var i = 0; i < text.length; i++) {
@@ -65,13 +80,28 @@
     }
   }
 
-  function draw(title, subtitle) {
+  var bgImg = null, overlay = 62, wireMode = false;
+
+  function drawCover(img) {
+    var ir = img.width / img.height, cr = W / H, sw, sh, sx, sy;
+    if (ir > cr) { sh = img.height; sw = sh * cr; sx = (img.width - sw) / 2; sy = 0; }
+    else { sw = img.width; sh = sw / cr; sx = 0; sy = (img.height - sh) / 2; }
+    g.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
+  }
+
+  function draw(title, subtitle, claim) {
     var serif = '"Source Han Serif SC","Songti SC","SimSun",serif';
     var sans = '"Microsoft YaHei","PingFang SC",sans-serif';
 
-    // 纸底
-    g.fillStyle = "#f6f1e6";
-    g.fillRect(0, 0, W, H);
+    // 底：有 ComfyUI 背景图就 cover 铺设，再压一层纸色保证文字可读
+    if (bgImg) {
+      drawCover(bgImg);
+      g.fillStyle = "rgba(246,241,230," + (overlay / 100).toFixed(2) + ")";
+      g.fillRect(0, 0, W, H);
+    } else {
+      g.fillStyle = "#f6f1e6";
+      g.fillRect(0, 0, W, H);
+    }
 
     // 纸纹（淡墨点，确定性地撒）
     var r = rnd(20260929);
@@ -99,6 +129,47 @@
     g.strokeRect(28, 28, W - 56, H - 56);
     g.strokeStyle = "rgba(184,145,47,.55)";
     g.strokeRect(35, 35, W - 70, H - 70);
+
+    // ---- 版式参考图模式：只画“哪里放什么”，供 AI 图生图 / ControlNet 对位 ----
+    if (wireMode) {
+      var sans2 = '"Microsoft YaHei","PingFang SC",sans-serif';
+      // 安全边距
+      g.setLineDash([8, 8]); g.lineWidth = 2; g.strokeStyle = "rgba(156,43,37,.75)";
+      g.strokeRect(28, 28, W - 56, H - 56); g.setLineDash([]);
+      // 文字块位置（与成品一致）
+      g.fillStyle = "rgba(120,110,95,.22)";
+      rr(72, 74, 86, 86, 8); g.fill();                 // 印章
+      rr(168, 82, 560, 62, 8); g.fill();               // 标题行
+      rr(168, 150, 360, 30, 6); g.fill();              // 副题
+      rr(96, 224, W - 192, 214, 12); g.fill();         // 对照卡
+      rr(96, 470, 720, 36, 18); g.fill();              // 数据条
+      rr(96, 556, 860, 46, 8); g.fill();               // 主张
+      rr(96, 600, W - 192, 26, 6); g.fill();           // 页脚
+      // 实际文字（淡灰，供模型/人工对齐）
+      g.fillStyle = "rgba(60,50,40,.80)";
+      g.font = "700 62px " + serif; spacedText(title, 188, 132, 6);
+      g.font = "400 22px " + sans2; spacedText(subtitle, 190, 168, 4);
+      g.fillStyle = "rgba(60,50,40,.60)";
+      g.font = "400 15px " + sans2;
+      g.fillText("← 对照卡区域：请在此绘制主视觉（山水 / 角楼 / 琉璃瓦），不要写入任何文字", 120, 340);
+      g.font = "400 14px " + sans2;
+      g.fillText("↑ 数据条区（信息小字，建议后期用矢量叠）", 120, 492);
+      var ss = 72; g.font = "700 " + ss + "px " + serif;
+      while (ss > 22 && measureSpaced(String(claim).trim(), 3) > (W - 192)) { ss -= 1; g.font = "700 " + ss + "px " + serif; }
+      g.fillStyle = "rgba(60,50,40,.80)";
+      spacedText(String(claim).trim(), 96, 578, 3);
+      g.fillStyle = "rgba(120,110,95,.75)";
+      g.font = "400 13px " + sans2;
+      g.fillText("1200 x 675 版式参考 ｜ 边距 28px ｜ 朱印 / 标题 / 副题 / 主张 位置已定，主视觉请填对照卡区", 96, 660);
+      return;
+    }
+
+    // 有背景图时，给标题区与页脚垫半透明纸，保证任何底图下都读得清
+    if (bgImg) {
+      g.fillStyle = "rgba(255,253,248,.82)";
+      rr(56, 54, 540, 156, 10); g.fill();
+      rr(56, 594, W - 112, 50, 8); g.fill();
+    }
 
     // 朱印「帝京」
     g.fillStyle = "#9c2b25";
@@ -176,10 +247,34 @@
       x += w + 12;
     });
 
-    // ---- 主张 ----
+    // ---- 主张：先按单行「放大到刚好填满宽度」，实在过长才拆两行 ----
+    var maxW = W - 192;
+    var oneLine = String(claim || "").trim();
+    var size = 72;                                  // 单行上限
+    g.font = "700 " + size + "px " + serif;
+    while (size > 22 && measureSpaced(oneLine, 3) > maxW) {
+      size -= 1;
+      g.font = "700 " + size + "px " + serif;
+    }
     g.fillStyle = "#2b241c";
-    g.font = "700 34px " + serif;
-    spacedText("把四百年前的北京，叠回今天的地图", 96, 580, 2);
+    var fitsOneLine = measureSpaced(oneLine, 3) <= maxW;
+
+    if (fitsOneLine) {
+      window.__claimSize = size;
+      spacedText(oneLine, 96, 578, 3);
+    } else {
+      // 太长：按「，」拆成对联式两行（每行再各自 fit）
+      var parts = oneLine.split(/[，,]/).map(function (s) { return s.trim(); }).filter(Boolean);
+      var s2 = 40;
+      for (;;) {
+        g.font = "700 " + s2 + "px " + serif;
+        if (s2 <= 16 || parts.every(function (p) { return measureSpaced(p, 3) <= maxW; })) break;
+        s2 -= 1;
+      }
+      window.__claimSize = s2;
+      var top = 552 - (parts.length - 2) * (s2 + 14) / 2;
+      parts.forEach(function (ln, i) { spacedText(ln, 96, top + i * (s2 + 14), 3); });
+    }
 
     // ---- 页脚 ----
     g.fillStyle = "#8c8271";
@@ -195,12 +290,33 @@
   }
 
   function redraw() {
-    draw(
-      document.getElementById("t1").value || "帝京寻踪",
-      document.getElementById("t2").value || "明代北京古今地图"
-    );
+    var t1 = document.getElementById("t1").value || "帝京寻踪";
+    var t2 = document.getElementById("t2").value || "明代北京古今地图";
+    var t3 = document.getElementById("t3").value || "探索明代北京城，百度细说帝京事";
+    draw(t1, t2, t3);
     document.getElementById("preview").src = canvas.toDataURL("image/png");
+
+    // 实时回报：实际选用的字号 + 文字宽度 + 可用宽度
+    var serif = '"Source Han Serif SC","Songti SC","SimSun",serif';
+    var sans = '"Microsoft YaHei","PingFang SC",sans-serif';
+    var avail = W - 192, rep = [];
+    g.font = "700 62px " + serif;
+    rep.push("标题 " + Math.round(measureSpaced(t1, 6)) + "px/62字号");
+    g.font = "400 22px " + sans;
+    rep.push("副题 " + Math.round(measureSpaced(t2, 4)) + "px/22");
+    var cs = window.__claimSize || 0;
+    g.font = "700 " + cs + "px " + serif;
+    rep.push("主张 " + Math.round(measureSpaced((String(t3).trim()), 3)) + "px 字号 " + cs);
+    document.getElementById("fit").textContent =
+      rep.join(" ／ ") + "　（可用宽度 " + avail + "px）";
   }
+
+  ["t1", "t2", "t3"].forEach(function (id) {
+    document.getElementById(id).addEventListener("input", function () {
+      clearTimeout(window.__rt);
+      window.__rt = setTimeout(redraw, 250);
+    });
+  });
 
   document.getElementById("dl").onclick = function () {
     canvas.toBlob(function (blob) {
@@ -212,6 +328,28 @@
     }, "image/png");
   };
   document.getElementById("redraw").onclick = redraw;
+
+  document.getElementById("bgFile").onchange = function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    var img = new Image();
+    img.onload = function () { bgImg = img; redraw(); };
+    img.src = URL.createObjectURL(f);
+  };
+  document.getElementById("bgClear").onclick = function () {
+    bgImg = null;
+    document.getElementById("bgFile").value = "";
+    redraw();
+  };
+  var wireCb = document.getElementById("wire");
+  wireCb.onchange = function () { wireMode = wireCb.checked; redraw(); };
+  var ovl = document.getElementById("ovl");
+  ovl.oninput = function () {
+    overlay = Number(ovl.value);
+    document.getElementById("ovlV").textContent = ovl.value;
+    redraw();
+  };
+
   redraw();
 })();
 </script>

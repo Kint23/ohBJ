@@ -18,3 +18,9 @@ dist/
 !.vscode/settings.json
 Thumbs.db
 desktop.ini
+
+# ---- 可由 tools/ 重新生成的大图（seed 固定，见 docs/AI素材说明.md）----
+banner/ai-bg-*.png
+banner/intro-scene-*.png
+banner/intro-title.png
+banner/intro-claim.png
